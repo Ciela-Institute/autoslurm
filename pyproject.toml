@@ -3,11 +3,11 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "milex_scheduler"
+name = "autoslurm"
 authors = [
     {name = "Alexandre Adam", email = "alexandre.adam@umontreal.ca"}
     ]
-description = "The Milex project job scheduler designed for HPC cluster scheduling and code reproducibility"
+description = "The AutoSlurm project job scheduler designed for HPC cluster scheduling and code reproducibility"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = []
@@ -25,7 +25,7 @@ lint = [
 ]
 
 [project.scripts]
-milex-configuration = "milex_scheduler.apps.milex_configuration:main"
-milex-submit = "milex_scheduler.apps.milex_submit:main"
-milex-schedule = "milex_scheduler.apps.milex_schedule:main"
-milex-initialize = "milex_scheduler.apps.milex_initialize:main"
+autoslurm-configuration = "autoslurm.apps.configuration:main"
+autoslurm-submit = "autoslurm.apps.submit:main"
+autoslurm-schedule = "autoslurm.apps.schedule:main"
+autoslurm-initialize = "autoslurm.apps.initialize:main"

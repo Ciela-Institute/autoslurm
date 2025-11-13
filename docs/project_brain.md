@@ -1,8 +1,8 @@
-# Project Brain — `milex_scheduler`
+# Project Brain — `autoslurm`
 
 ## 🧭 Purpose
 
-`milex_scheduler` automates and streamlines **SLURM job management** on high-performance computing (HPC) systems.
+`autoslurm` automates and streamlines **SLURM job management** on high-performance computing (HPC) systems.
 It abstracts away the manual writing of shell scripts and command-line invocations required to submit jobs on clusters.
 
 The goal is to let users (or other software) request computational resources through a **Python or CLI interface**, while the system:
@@ -33,25 +33,25 @@ This makes job scheduling **portable**, **reproducible**, and **version-controll
 
 1. **Initialize** the environment and write a config file:
 ```bash
-milex init
+autoslurm init
 ```
 
 2. Create a new job or bundle:
 ```bash
-milex schedule train_model.py --time 04:00:00 --gpus 1
+autoslurm schedule train_model.py --time 04:00:00 --gpus 1
 ```
 
 3. Submit jobs (local or remote)
 ```bash
-milex submit --remote
+autoslurm submit --remote
 ```
 
 
 ## 🧩 Integration With Other Projects
 
-Other Python projects or agents can treat milex_scheduler as a job-submission service:
+Other Python projects or agents can treat autoslurm as a job-submission service:
 
-from milex_scheduler import submit_job
+from autoslurm import submit_job
 
 submit_job(
     script="train.py",
@@ -62,10 +62,10 @@ submit_job(
 
 or use the CLI for batched jobs:
 
-milex schedule my_experiment.py --bundle exp_1 --depends preprocess
+autoslurm schedule my_experiment.py --bundle exp_1 --depends preprocess
 
 
-This allows automated pipelines, experiment managers, and agent systems to use milex_scheduler as a low-level backend for HPC execution.
+This allows automated pipelines, experiment managers, and agent systems to use autoslurm as a low-level backend for HPC execution.
 
 ## 🧠 Design Principles
 

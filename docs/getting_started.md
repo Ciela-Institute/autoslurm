@@ -2,18 +2,18 @@
 
 ## Installation
 
-### Install the `milex-scheduler` package
+### Install the `autoslurm` package
 
 ```bash
-git clone git@github.com:Ciela-Institute/milex_scheduler.git
-cd milex_scheduler
+git clone git@github.com:Ciela-Institute/autoslurm.git
+cd autoslurm
 pip install -e .
 ```
 
-### Configure `milex-scheduler` for your environment
+### Configure `autoslurm` for your environment
 
 ```bash
-milex-configuration
+autoslurm-configuration
 ```
 
 This command will allow you to configure paths and user-specific details for
@@ -36,7 +36,7 @@ section.
 ### Schedule a job
 
 ```bash
-milex-schedule my-script \
+autoslurm-schedule my-script \
     # Application args
     --my_job_arg1=arg1 \
     # SLURM args
@@ -55,15 +55,15 @@ Once the job is scheduled, you can submit it at any time just by using the name
 of the application.
 
 ```bash
-milex-submit my-script --machine=machine
+autoslurm-submit my-script --machine=machine
 ```
 
 This command submits `my-script` on the `machine` name specified in your
-configuration (see [Milex Configuration](#Milex-Configuration)). You can also
+configuration (see [AutoSlurm Configuration](#AutoSlurm-Configuration)). You can also
 schedule and submit a job at the same time to skip a step.
 
 ```bash
-milex-schedule my-script --submit --machine=machine\
+autoslurm-schedule my-script --submit --machine=machine\
     # Application and SLURM args
     ...
 ```
@@ -74,16 +74,16 @@ Use the `--append` keyword to combine multiple jobs in a bundle. Use the
 `--name` keyword to specify the name of the bundle.
 
 ```bash
-milex-schedule job1 --name=my-bundle
-milex-schedule job2 --append --name=my-bundle
-milex-submit my-bundle
+autoslurm-schedule job1 --name=my-bundle
+autoslurm-schedule job2 --append --name=my-bundle
+autoslurm-submit my-bundle
 ```
 
 An empty bundle can be initialized as follows
 ```bash
-milex-initialize my-bundle
+autoslurm-initialize my-bundle
 ```
-Jobs can then be appended to this bundle using `milex-schedule --append --name=my-bundle`.
+Jobs can then be appended to this bundle using `autoslurm-schedule --append --name=my-bundle`.
 This is useful when you want to schedule jobs in a loop.
 
 **Warning**: In case `--append` is not used, two bundles (each with a single job) are
@@ -96,14 +96,14 @@ Dependencies can be set by specifying the job names in the `--dependencies`
 argument.
 
 ```bash
-milex-schedule job1 --name=my-bundle
-milex-schedule job2 --append --name=my-bundle --dependencies job1
+autoslurm-schedule job1 --name=my-bundle
+autoslurm-schedule job2 --append --name=my-bundle --dependencies job1
 ```
 
 Multiple dependencies can be set by separating the job names with a space.
 
 ```bash
-milex-schedule job3 --append --name=my-bundle \
+autoslurm-schedule job3 --append --name=my-bundle \
     --dependencies job1 job2
 ```
 
@@ -126,14 +126,14 @@ Commands like copying files or creating directories can be
 executed before the python script by using the `--pre-command` argument when scheduling a job.
 
 ```bash
-milex-schedule my-script \
+autoslurm-schedule my-script \
     --pre-command "mkdir -p /path/to/my/directory"
     ...
 ```
 Multiple pre-commands are provided by separating them with a semicolon
 
 ```bash
-milex-schedule my-script \
+autoslurm-schedule my-script \
     --pre-command "mkdir -p /path/to/my/directory; cp /path/to/my/file /path/to/my/directory"
     ...
 ```
@@ -141,9 +141,74 @@ milex-schedule my-script \
 Or separating them with a space
 
 ```bash
-milex-schedule my-script \
+autoslurm-schedule my-script \
     --pre-command \
     "mkdir -p /path/to/my/directory" \
     "cp /path/to/my/file /path/to/my/directory"\
     ...
 ```
+
+## Worked Examples
+
+### Example 1 — Parameter sweeps with bundles
+
+```bash
+# Prepare an empty bundle
+autoslurm-initialize sweep-demo
+
+# Append variants (here preprocessing and three seeds)
+autoslurm-schedule preprocess-data \
+    --append --name sweep-demo \
+    --time 00-30:00 --mem 8G
+
+for seed in 1 2 3; do
+  autoslurm-schedule train-model \
+      --append --name sweep-demo \
+      --dependencies preprocess-data \
+      --time 04:00:00 --gres gpu:1 --cpus_per_task 8 \
+      --seed "$seed" --epochs 50
+done
+
+autoslurm-submit sweep-demo --machine local
+```
+
+This pattern stores every variant inside a single JSON bundle. Inspect the file
+under `$AUTOSLURM/jobs/sweep-demo_<timestamp>.json` to reproduce, edit, or copy
+the workload later.
+
+### Example 2 — Remote submission with environment activation
+
+```bash
+autoslurm-schedule inference \
+    --name nightly-inference \
+    --submit \
+    --machine research-gpu \
+    --pre-command "source /shared/miniconda3/etc/profile.d/conda.sh; conda activate ldm" \
+    --time 02:00:00 --mem 32G --gres gpu:1 \
+    --checkpoint /models/ldm.ckpt --input_path /data/batch.json
+```
+
+If `research-gpu` is defined in `autoslurm-configuration`, the job is copied to
+the remote `$path/slurm/` directory, `sbatch` is executed over SSH, and the
+stack keeps track of the returned job ID.
+
+### Example 3 — Programmatic scheduling from Python
+
+```python
+from autoslurm.save_load_jobs import save_job
+from autoslurm.job_runner import submit_jobs
+
+job = {
+    "name": "analysis",
+    "script": "stats-pipeline",
+    "script_args": {"input": "results.csv", "alpha": 0.05},
+    "slurm": {"time": "00:45:00", "mem": "4G", "cpus_per_task": 2},
+}
+
+save_job(job, bundle_name="analytics", append=True)
+submit_jobs("analytics")  # Uses default machine config unless overridden
+```
+
+Use this API when another service (for example, an LLM agent) needs to stage
+jobs without invoking the CLI. The saved bundle mirrors the CLI format, so you
+can mix and match tooling safely.

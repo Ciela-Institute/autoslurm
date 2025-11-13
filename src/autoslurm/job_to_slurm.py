@@ -39,7 +39,7 @@ def write_slurm_content(file: TextIOWrapper, job: dict, machine_config: dict) ->
             file.write(f"#SBATCH --{key.replace('_', '-')}={value}\n")
 
     # Make sure path is exported to environment
-    file.write(f"export MILEX=\"{machine_config['path']}\"\n")
+    file.write(f"export AUTOSLURM=\"{machine_config['path']}\"\n")
 
     # Environment activation command
     if env_command:

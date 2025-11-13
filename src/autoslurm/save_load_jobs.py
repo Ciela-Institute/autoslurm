@@ -190,7 +190,7 @@ def transfer_slurm_to_remote(
         raise ValueError("Either machine_name or machine_config must be specified")
     if machine_config.get("path", None) is None:
         raise ValueError(
-            f"Machine {machine_config['hostname']} configuration must contain a path to the milex directory"
+            f"Machine {machine_config['hostname']} configuration must contain a path to the autoslurm directory"
         )
 
     # Transfer the script to the remote machine

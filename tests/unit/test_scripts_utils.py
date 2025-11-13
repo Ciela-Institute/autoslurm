@@ -1,7 +1,7 @@
 import pytest
 from argparse import Namespace
 from unittest.mock import patch
-from milex_scheduler.utils import machine_config
+from autoslurm.utils import machine_config
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def mock_load_config(tmp_path):
         },
     }
     with patch(
-        "milex_scheduler.utils.load_config", return_value=mock_config
+        "autoslurm.utils.load_config", return_value=mock_config
     ) as mock_load_config:
         yield mock_load_config
 

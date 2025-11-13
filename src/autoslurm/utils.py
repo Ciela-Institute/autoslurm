@@ -40,7 +40,7 @@ def load_config() -> dict:
     """
     if not os.path.exists(CONFIG_FILE_PATH):
         raise EnvironmentError(
-            f"Configuration file not found at {CONFIG_FILE_PATH}. Please use `milex-configurations` to create the configurations for milex."
+            f"Configuration file not found at {CONFIG_FILE_PATH}. Please use `autoslurm-configuration` to create the configurations for autoslurm."
         )
     with open(CONFIG_FILE_PATH, "r") as file:
         return json.load(file)
@@ -81,17 +81,17 @@ def machine_config(args: Namespace) -> dict:
     # Enforce required keys
     if machine_config_.get("slurm_account", None) is None:
         raise AttributeError(
-            "'slurm_account' account must be provided. Rerun with --slurm_account option or rerun milex-configuration to edit the configuration for the machine."
+            "'slurm_account' account must be provided. Rerun with --slurm_account option or rerun autoslurm-configuration to edit the configuration for the machine."
         )
 
     if machine_config_.get("path", None) is None:
         raise AttributeError(
-            "'path' must be provided. Rerun with --path option or rerun milex-configuration to edit the configuration for the machine."
+            "'path' must be provided. Rerun with --path option or rerun autoslurm-configuration to edit the configuration for the machine."
         )
 
     if machine_config_.get("env_command", None) is None:
         raise AttributeError(
-            "'env_command' must be provided. Rerun with --env_command option or rerun milex-configuration to edit the configuration for the machine."
+            "'env_command' must be provided. Rerun with --env_command option or rerun autoslurm-configuration to edit the configuration for the machine."
         )
 
     return machine_config_
@@ -106,12 +106,12 @@ def ssh_host_from_config(
         if machine_config.get("username", None) is None:
             raise AttributeError(
                 f"'username' must be provided when 'hostname' is not specified. "
-                f"Rerun with --username option or rerun milex-configuration to edit the configuration for the machine {machine}."
+                f"Rerun with --username option or rerun autoslurm-configuration to edit the configuration for the machine {machine}."
             )
         elif machine_config.get("hosturl", None) is None:
             raise AttributeError(
                 "'hosturl' must be provided if 'hostname' is not specified. "
-                "Rerun with --hosturl option or rerun milex-configuration to edit the configuration for the machine {machine}."
+                "Rerun with --hosturl option or rerun autoslurm-configuration to edit the configuration for the machine {machine}."
             )
         hostname = f"{machine_config['username']}@{machine_config['hosturl']}"
         if machine_config.get("key_path", None) is not None:
@@ -129,12 +129,12 @@ def scp_host_and_keypath_from_config(
         if machine_config.get("username", None) is None:
             raise AttributeError(
                 f"'username' must be provided when 'hostname' is not specified. "
-                f"Rerun with --username option or rerun milex-configuration to edit the configuration for the machine {machine}."
+                f"Rerun with --username option or rerun autoslurm-configuration to edit the configuration for the machine {machine}."
             )
         elif machine_config.get("hosturl", None) is None:
             raise AttributeError(
                 "'hosturl' must be provided if 'hostname' is not specified. "
-                "Rerun with --hosturl option or rerun milex-configuration to edit the configuration for the machine {machine}."
+                "Rerun with --hosturl option or rerun autoslurm-configuration to edit the configuration for the machine {machine}."
             )
         hostname = f"{machine_config['username']}@{machine_config['hosturl']}"
         if machine_config.get("key_path", None) is not None:

@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock
-from milex_scheduler.apps.milex_schedule import parse_script_args, parse_args, main
+from autoslurm.apps.schedule import parse_script_args, parse_args, main
 from argparse import Namespace
 import pytest
 import json
@@ -23,7 +23,7 @@ def mock_submit_job():
     We avoid the full integration of submit_jobs, which is integrated in another test (see test_job_runner.py)
     Here, we test up until the point where submit_jobs is called.
     """
-    with patch("milex_scheduler.apps.milex_schedule.submit_jobs") as mock_submit_job:
+    with patch("autoslurm.apps.schedule.submit_jobs") as mock_submit_job:
         yield mock_submit_job
 
 
@@ -73,20 +73,14 @@ def mock_load_config(monkeypatch, tmp_path):
     os.makedirs(tmp_path / "slurm", exist_ok=True)
 
     # Patch all the instances of load_config to save and load jobs from the tmp_path
-    monkeypatch.setattr(
-        "milex_scheduler.save_load_jobs.load_config", lambda: mock_config
-    )
-    monkeypatch.setattr("milex_scheduler.job_to_slurm.load_config", lambda: mock_config)
-    monkeypatch.setattr(
-        "milex_scheduler.job_dependency.load_config", lambda: mock_config
-    )
-    monkeypatch.setattr("milex_scheduler.job_runner.load_config", lambda: mock_config)
-    monkeypatch.setattr("milex_scheduler.run_slurm.load_config", lambda: mock_config)
-    monkeypatch.setattr("milex_scheduler.utils.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.save_load_jobs.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.job_to_slurm.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.job_dependency.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.job_runner.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.run_slurm.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.utils.load_config", lambda: mock_config)
 
-    with patch(
-        "milex_scheduler.load_config", return_value=mock_config
-    ) as mock_load_config:
+    with patch("autoslurm.load_config", return_value=mock_config) as mock_load_config:
         yield mock_load_config
 
 

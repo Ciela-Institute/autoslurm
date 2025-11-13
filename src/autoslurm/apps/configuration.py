@@ -33,8 +33,8 @@ def setup_directories(base_path, directories, hostname=None):
 
 
 def update_bashrc(base_path, hostname=None):
-    """Append MILEX environment variable to .bashrc for persistence, locally or remotely."""
-    bash_command = f'echo "export MILEX=\\"{base_path}\\"" >> ~/.bashrc'
+    """Append AUTOSLURM environment variable to .bashrc for persistence, locally or remotely."""
+    bash_command = f'echo "export AUTOSLURM=\\"{base_path}\\"" >> ~/.bashrc'
     if hostname is not None:
         ssh_command = ["ssh", hostname, bash_command]
         subprocess.run(ssh_command)
@@ -74,12 +74,12 @@ def main():
     else:
         example_config = {
             "local": {
-                "path": "/path/to/local/milex",
+                "path": "/path/to/local/autoslurm",
                 "env_command": "source /path/to/local/venv/bin/activate",
                 "slurm_account": "def-bengioy",
             },
             "remote_machine": {
-                "path": "/path/to/remote/milex",
+                "path": "/path/to/remote/autoslurm",
                 "env_command": "source /path/to/remote/venv/bin/activate",
                 "slurm_account": "rrg-account_name",
                 "hostname": "machine",
@@ -149,4 +149,4 @@ def main():
                     )
                 continue
 
-    print("Milex setup is complete.")
+    print("AutoSlurm setup is complete.")

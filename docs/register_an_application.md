@@ -1,6 +1,6 @@
 # Register a script
 
-For `milex-schedule` to be able to schedule and run your scripts,
+For `autoslurm-schedule` to be able to schedule and run your scripts,
 some minimal structure is required.
 In short,
 a script must be installed in the virtual environment used to submit jobs.
@@ -79,16 +79,16 @@ my-script-cli = "name_of_package.script:cli"
 ```
 
 A program with the suffix `-cli` must always be registered for each script
-to allow `milex-schedule` to capture the command-line arguments of the script.
+to allow `autoslurm-schedule` to capture the command-line arguments of the script.
 
 Once the `main` and `cli` functions are registered,
 `my-script` can be scheduled and submitted using the
-`milex-schedule` and `milex-submit` commands respectively.
+`autoslurm-schedule` and `autoslurm-submit` commands respectively.
 More information on these commands can be found in the [Getting Started](./getting_started.md) section.
 
 ## The `main` and `cli` Functions
 
-Some minimal structure is required on your script because `milex-schedule` can only
+Some minimal structure is required on your script because `autoslurm-schedule` can only
 compile the command-line arguments of your script if a function (which we call `cli`)
 prints these arguments on the console.
 

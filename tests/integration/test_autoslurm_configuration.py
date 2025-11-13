@@ -2,19 +2,19 @@ import os
 import json
 import pytest
 from unittest.mock import patch, MagicMock
-from milex_scheduler.apps.milex_configuration import (
+from autoslurm.apps.configuration import (
     main,
 )
 
 # Mock configuration for testing
 EXAMPLE_CONFIG = {
     "local": {
-        "path": "milex",
+        "path": "autoslurm",
         "env_command": "source /path/to/local/venv/bin/activate",
         "slurm_account": "def-bengioy",
     },
     "remote_machine_w_key": {
-        "path": "milex_w_key",
+        "path": "autoslurm_w_key",
         "env_command": "source /path/to/remote/venv/bin/activate",
         "slurm_account": "rrg-account_name",
         "hosturl": "machine.domain.com",
@@ -22,14 +22,14 @@ EXAMPLE_CONFIG = {
         "key_path": "~/.ssh/id1_rsa",
     },
     "remote_machine_wo_key": {
-        "path": "milex_wo_hostname",
+        "path": "autoslurm_wo_hostname",
         "env_command": "source /path/to/remote/venv/bin/activate",
         "slurm_account": "rrg-account_name",
         "hosturl": "machine.domain.com",
         "username": "user1",
     },
     "remote_machine_w_hostname": {
-        "path": "milex_w_hostname",
+        "path": "autoslurm_w_hostname",
         "env_command": "source /path/to/remote/venv/bin/activate",
         "slurm_account": "rrg-account_name",
         "hostname": "machine",
@@ -59,7 +59,7 @@ def mock_os_system(tmp_path):
     original_os_system = os.system
 
     def mocked_os_system(command):
-        if "export MILEX=" in command:
+        if "export AUTOSLURM=" in command:
             with open(os.path.join(tmp_path, ".bashrc"), "a") as f:
                 f.write(command + "\n")
         else:
@@ -85,14 +85,14 @@ def setup_mock_subprocess_run(tmp_path):
             path = os.path.join(tmp_path, dirname)
             os.makedirs(path, exist_ok=True)
         elif task == "echo":
-            assert cmd[2].startswith('echo "export MILEX=')
+            assert cmd[2].startswith('echo "export AUTOSLURM=')
             if cmd[1] == "-i ~/.ssh/id1_rsa user1@machine.domain.com":
                 path = EXAMPLE_CONFIG["remote_machine_w_key"]["path"]
             elif cmd[1] == "user1@machine.domain.com":
                 path = EXAMPLE_CONFIG["remote_machine_wo_key"]["path"]
             elif cmd[1] == "machine":
                 path = EXAMPLE_CONFIG["remote_machine_w_hostname"]["path"]
-            bashrc_content = f"export MILEX={path}"
+            bashrc_content = f"export AUTOSLURM={path}"
             with open(os.path.join(tmp_path, ".bashrc"), "a") as f:
                 f.write(bashrc_content + "\n")
         return MagicMock(returncode=0, stderr="")
@@ -104,8 +104,8 @@ def setup_mock_subprocess_run(tmp_path):
 @patch("subprocess.run")
 @patch("socket.gethostbyname")
 @patch("socket.gaierror")
-@patch("milex_scheduler.apps.milex_configuration.open_editor")
-def test_milex_configuration(
+@patch("autoslurm.apps.configuration.open_editor")
+def test_autoslurm_configuration(
     mock_open_editor,
     mock_gaierror,
     mock_gethostbyname,
@@ -129,9 +129,7 @@ def test_milex_configuration(
         json.dump(EXAMPLE_CONFIG, f)
 
     # Run the main setup function
-    with patch(
-        "milex_scheduler.apps.milex_configuration.CONFIG_FILE_PATH", str(config_path)
-    ):
+    with patch("autoslurm.apps.configuration.CONFIG_FILE_PATH", str(config_path)):
         main()
 
     calls = (
@@ -162,7 +160,7 @@ def test_milex_configuration(
         if hostname_resolvable:
             for key in EXAMPLE_CONFIG.keys():
                 path = EXAMPLE_CONFIG[key]["path"]
-                assert f"export MILEX={path}" in bashrc_content
+                assert f"export AUTOSLURM={path}" in bashrc_content
         else:
             path = EXAMPLE_CONFIG["local"]["path"]
-            assert f"export MILEX={path}" in bashrc_content
+            assert f"export AUTOSLURM={path}" in bashrc_content

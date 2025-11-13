@@ -1,7 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from milex_scheduler import save_bundle, submit_jobs
+from autoslurm import save_bundle, submit_jobs
 from glob import glob
 
 # Mock Data for Job Configurations
@@ -50,7 +50,7 @@ expected_bundle_content = {
         "#SBATCH --gres=gpu:1\n",
         "#SBATCH --mem=4G\n",
         "#SBATCH --time=01:00:00\n",
-        'export MILEX="/path/to/remote"\n',
+        'export AUTOSLURM="/path/to/remote"\n',
         "source /path/to/remote/venv/bin/activate\n",  # Environment activation command is added if provided
         "run-job-a \\\n",
         "  --param1=value1 \\\n",
@@ -65,7 +65,7 @@ expected_bundle_content = {
         "#SBATCH --cpus-per-task=2\n",
         "#SBATCH --mem=8G\n",
         "#SBATCH --time=02:00:00\n",
-        'export MILEX="/path/to/remote"\n',
+        'export AUTOSLURM="/path/to/remote"\n',
         "source /path/to/remote/venv/bin/activate\n",  # Environment activation command is added if provided
         "run-job-b \\\n",
         "  --param1=value3 \\\n",
@@ -80,7 +80,7 @@ expected_bundle_content = {
         "#SBATCH --cpus-per-task=4\n",
         "#SBATCH --mem=16G\n",
         "#SBATCH --time=03:00:00\n",
-        'export MILEX="/path/to/remote"\n',  # Added automatically in every script
+        'export AUTOSLURM="/path/to/remote"\n',  # Added automatically in every script
         "source /path/to/remote/venv/bin/activate\n",  # Environment activation command is added if provided
         "echo 'Starting Job C'\n",  # Pre-commands are added between the environment activation and the main command
         "run-job-c \\\n",
@@ -128,20 +128,14 @@ def mock_load_config(monkeypatch, tmp_path):
     os.makedirs(tmp_path / "slurm", exist_ok=True)
 
     # Patch all the instances of load_config to save and load jobs from the tmp_path
-    monkeypatch.setattr(
-        "milex_scheduler.save_load_jobs.load_config", lambda: mock_config
-    )
-    monkeypatch.setattr("milex_scheduler.job_to_slurm.load_config", lambda: mock_config)
-    monkeypatch.setattr(
-        "milex_scheduler.job_dependency.load_config", lambda: mock_config
-    )
-    monkeypatch.setattr("milex_scheduler.job_runner.load_config", lambda: mock_config)
-    monkeypatch.setattr("milex_scheduler.run_slurm.load_config", lambda: mock_config)
-    monkeypatch.setattr("milex_scheduler.utils.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.save_load_jobs.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.job_to_slurm.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.job_dependency.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.job_runner.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.run_slurm.load_config", lambda: mock_config)
+    monkeypatch.setattr("autoslurm.utils.load_config", lambda: mock_config)
 
-    with patch(
-        "milex_scheduler.load_config", return_value=mock_config
-    ) as mock_load_config:
+    with patch("autoslurm.load_config", return_value=mock_config) as mock_load_config:
         yield mock_load_config
 
 
@@ -173,7 +167,7 @@ def setup_mock_subprocess_run() -> MagicMock:
     ],
 )
 @patch("subprocess.run", new_callable=setup_mock_subprocess_run)
-@patch("milex_scheduler.run_slurm.run_slurm_remotely")
+@patch("autoslurm.run_slurm.run_slurm_remotely")
 def test_integration_schedule_jobs(
     mock_run_script_remotely, mock_ssh_client, mock_machine_config, mock_load_config
 ):
@@ -183,10 +177,10 @@ def test_integration_schedule_jobs(
 
     # Now check the content of the SLURM scripts  generated
     user_config = mock_load_config()
-    milex_path = user_config["local"]["path"]
-    slurm_dir = os.path.join(milex_path, "slurm")
+    autoslurm_path = user_config["local"]["path"]
+    slurm_dir = os.path.join(autoslurm_path, "slurm")
 
-    print(os.listdir(milex_path))
+    print(os.listdir(autoslurm_path))
     print(os.listdir(slurm_dir))
 
     files_created = glob(os.path.join(slurm_dir, "*.sh"))
@@ -236,7 +230,7 @@ mock_jobs_error = {
     ],
 )
 @patch("subprocess.run", new_callable=setup_mock_subprocess_run)
-@patch("milex_scheduler.run_slurm.run_slurm_remotely")
+@patch("autoslurm.run_slurm.run_slurm_remotely")
 def test_integration_schedule_jobs_with_error(
     mock_run_script_remotely, mock_ssh_client, mock_machine_config, mock_load_config
 ):

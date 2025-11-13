@@ -1,11 +1,11 @@
-from milex_scheduler.save_load_jobs import (
+from autoslurm.save_load_jobs import (
     load_bundle,
     save_job,
     save_bundle,
     transfer_slurm_to_remote,
     nearest_bundle_filename,
 )
-from milex_scheduler import DATE_FORMAT
+from autoslurm import DATE_FORMAT
 from unittest.mock import patch
 from unittest.mock import MagicMock
 from datetime import datetime
@@ -39,7 +39,7 @@ def mock_load_config(tmp_path):
     mock_config = {"local": {"path": tmp_path}}
     os.makedirs(tmp_path / "jobs", exist_ok=True)
     with patch(
-        "milex_scheduler.save_load_jobs.load_config", return_value=mock_config
+        "autoslurm.save_load_jobs.load_config", return_value=mock_config
     ) as mock_load_config:
         yield mock_load_config
 
@@ -317,7 +317,7 @@ def test_transfer_script_to_remote_no_config_raises_error(mock_load_config):
 def test_transfer_script_to_remote_no_machine_found_raises_error(mock_load_config):
     job_name = "job_name"
     machine_name = "non_existent_machine"
-    with patch("milex_scheduler.load_config", return_value={}):
+    with patch("autoslurm.load_config", return_value={}):
         with pytest.raises(EnvironmentError) as excinfo:
             transfer_slurm_to_remote(job_name, machine_name=machine_name)
         assert "No configuration found for machine" in str(excinfo.value)

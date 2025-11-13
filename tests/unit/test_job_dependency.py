@@ -1,5 +1,5 @@
 from unittest.mock import patch
-from milex_scheduler.job_dependency import (
+from autoslurm.job_dependency import (
     update_slurm_with_dependencies,
     dependency_graph,
 )
@@ -61,7 +61,7 @@ def test_update_slurm_with_existing_dependency(tmp_path):
 
     # Mock load_config to return the path of the temporary directory
     mock_config = {"local": {"path": str(tmp_path)}}
-    with patch("milex_scheduler.job_dependency.load_config", return_value=mock_config):
+    with patch("autoslurm.job_dependency.load_config", return_value=mock_config):
         update_slurm_with_dependencies(script_name, ["123", "456"])
         with open(script_path, "r") as f:
             content = f.read()
@@ -81,7 +81,7 @@ def test_update_slurm_script_without_dependency(tmp_path):
 
     # Mock load_config to return the path of the temporary directory
     mock_config = {"local": {"path": str(tmp_path)}}
-    with patch("milex_scheduler.job_dependency.load_config", return_value=mock_config):
+    with patch("autoslurm.job_dependency.load_config", return_value=mock_config):
         update_slurm_with_dependencies(script_name, ["123", "456"])
 
         with open(script_path, "r") as f:
@@ -95,7 +95,7 @@ def test_update_empty_slurm_script(tmp_path):
 
     # Mock load_config to return the path of the temporary directory
     mock_config = {"local": {"path": str(tmp_path)}}
-    with patch("milex_scheduler.job_dependency.load_config", return_value=mock_config):
+    with patch("autoslurm.job_dependency.load_config", return_value=mock_config):
         update_slurm_with_dependencies(script_name, ["123", "456"])
 
         with open(script_path, "r") as f:
@@ -110,7 +110,7 @@ def test_update_non_standard_slurm_script(tmp_path):
 
     # Mock load_config to return the path of the temporary directory
     mock_config = {"local": {"path": str(tmp_path)}}
-    with patch("milex_scheduler.job_dependency.load_config", return_value=mock_config):
+    with patch("autoslurm.job_dependency.load_config", return_value=mock_config):
         update_slurm_with_dependencies(script_name, ["123", "456"])
 
         with open(script_path, "r") as f:

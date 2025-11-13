@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock, Mock
-from milex_scheduler.run_slurm import get_job_id_from_sbatch_output
-from milex_scheduler.run_slurm import run_slurm_remotely, run_slurm_locally
+from autoslurm.run_slurm import get_job_id_from_sbatch_output
+from autoslurm.run_slurm import run_slurm_remotely, run_slurm_locally
 import os
 
 
@@ -20,7 +20,7 @@ def mock_load_config(tmp_path):
     mock_config = {"local": {"path": tmp_path}}
     os.makedirs(tmp_path / "jobs", exist_ok=True)
     with patch(
-        "milex_scheduler.run_slurm.load_config", return_value=mock_config
+        "autoslurm.run_slurm.load_config", return_value=mock_config
     ) as mock_load_config:
         yield mock_load_config
 

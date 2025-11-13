@@ -17,7 +17,7 @@ concurrency:
 
 env:
   FORCE_COLOR: 3
-  PROJECT_NAME: "milex_scheduler"
+  PROJECT_NAME: "autoslurm"
 
 jobs:
   build:

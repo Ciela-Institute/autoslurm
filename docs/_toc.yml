@@ -4,4 +4,8 @@ chapters:
   - file: getting_started
   - file: configuration
   - file: register_an_application
+  - part: Agent Guide
+    chapters:
+      - file: agent/index
+      - file: agent/package_map
   #-file: remote_machine

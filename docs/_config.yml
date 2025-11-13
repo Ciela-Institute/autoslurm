@@ -1,9 +1,9 @@
 #######################################################################################
 # Book settings
-title: Milex Scheduler # The title of the book. Will be placed in the left navbar.
+title: AutoSlurm # The title of the book. Will be placed in the left navbar.
 author: Alexandre Adam # The author of the book
 copyright: "2024" # Copyright year to be placed in the footer
-#logo                        : "figures/milex_logo_cyber.png"  # A path to the book logo
+#logo                        : "figures/autoslurm_logo_cyber.png"  # A path to the book logo
 # Patterns to skip when building the book. Can be glob-style (e.g. "*skip.ipynb")
 exclude_patterns: [_build, Thumbs.db, .DS_Store, "**.ipynb_checkpoints"]
 # Auto-exclude files not in the toc
@@ -39,7 +39,7 @@ html:
 #colab_url                 : "" # The URL of Google Colab (https://colab.research.google.com)
 
 repository:
-  url: https://github.com/Ciela-Institute/milex_scheduler # The URL to your book's repository
+  url: https://github.com/Ciela-Institute/autoslurm # The URL to your book's repository
   path_to_book: "docs/" # A path to your book's folder, relative to the repository root.
   branch: main # Which branch of the repository should be used when creating links
 
