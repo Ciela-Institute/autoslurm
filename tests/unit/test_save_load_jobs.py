@@ -1,6 +1,6 @@
 from autoslurm.save_load_jobs import (
     load_bundle,
-    save_job,
+    schedule_job,
     save_bundle,
     transfer_slurm_to_remote,
     nearest_bundle_filename,
@@ -95,7 +95,7 @@ def test_nearest_bundle_file(tmp_path, mock_load_config):
         nearest_bundle_filename("job3")
 
 
-def test_save_job_success(tmp_path, mock_load_config):
+def test_schedule_job_success(tmp_path, mock_load_config):
     bundle_name = "test_job"
     mock_jobs = {"Job1": {"script": "run-job-1"}, "Job2": {"script": "run-job-2"}}
     now = datetime.now()
@@ -178,10 +178,10 @@ def test_save_append_jobs_to_bundle(tmp_path, mock_load_config):
     bundle_name = "dummy_bundle"
 
     # Save jobA
-    save_job(mock_jobA, bundle_name)
+    schedule_job(mock_jobA, bundle_name)
 
     # Append jobB to the same bundle
-    save_job(mock_jobB, bundle_name, append=True)
+    schedule_job(mock_jobB, bundle_name, append=True)
 
     # Load the bundle
     jobs, dependencies, date = load_bundle(bundle_name)
@@ -203,11 +203,11 @@ def test_save_append_job_to_bundle_with_same_name(tmp_path, mock_load_config):
     bundle_name = "dummy_bundle"
 
     # Save jobA
-    save_job(mock_jobA, bundle_name)
+    schedule_job(mock_jobA, bundle_name)
 
     # Append jobB to the same bundle
-    save_job(mock_jobB, bundle_name, append=True)
-    save_job(mock_jobC, bundle_name, append=True)
+    schedule_job(mock_jobB, bundle_name, append=True)
+    schedule_job(mock_jobC, bundle_name, append=True)
 
     # Load the bundle
     jobs, dependencies, date = load_bundle(bundle_name)
@@ -222,7 +222,7 @@ def test_save_append_job_to_bundle_with_same_name(tmp_path, mock_load_config):
     assert "JobA_002" in [job["name"] for job in jobs]
 
 
-def test_save_jobs_append_with_same_name(tmp_path, mock_load_config):
+def test_schedule_jobs_append_with_same_name(tmp_path, mock_load_config):
     bundle_a = {"JobA": {"script": "run-joba"}, "JobB": {"script": "run-jobb"}}
     bundle_b = {"JobA": {"script": "run-joba"}, "JobB": {"script": "run-jobb"}}
 
@@ -266,17 +266,17 @@ def test_save_bundle_initialize(mock_load_config):
     save_bundle({}, bundle_name)
 
 
-def test_save_job_with_same_name_in_append_mode(mock_load_config):
+def test_schedule_job_with_same_name_in_append_mode(mock_load_config):
     # Check that new bundle is created with an index appended
     mock_jobA = {"name": "JobA", "script": "run-joba"}
     mock_jobB = {"name": "JobA", "script": "run-joba"}
     bundle_name = "dummy_bundle"
 
     # Save jobA
-    save_job(mock_jobA, bundle_name)
+    schedule_job(mock_jobA, bundle_name)
 
     # Append jobB to the same bundle
-    save_job(mock_jobB, bundle_name, append=True)
+    schedule_job(mock_jobB, bundle_name, append=True)
 
     # Load the bundle
     jobs, dependencies, date = load_bundle(bundle_name)

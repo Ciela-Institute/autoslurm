@@ -10,7 +10,7 @@ the concrete entry points and the data flowing through AutoSlurm.
 ```
 ┌──────────────────────┐    ┌─────────────────────────────┐
 │ autoslurm.apps.* CLI │    │ autoslurm.save_load_jobs    │
-│ schedule/submit/...  │──▶ │ save_job / load_bundle      │
+│ schedule/submit/...  │──▶ │ schedule_job / load_bundle  │
 └──────────┬───────────┘    └──────────────┬──────────────┘
            │                               │
            │ job JSON bundles              │ (jobs/<name>_*.json)
@@ -49,7 +49,7 @@ paths they touch, which is useful for log parsing.
 
 | Function | Location | Description |
 | --- | --- | --- |
-| `save_job(job, bundle_name=None, append=False)` | `autoslurm.save_load_jobs` | Persist a single job dict. Creates or appends to `<bundle>_YYYYMMDDhhmmss.json`. |
+| `schedule_job(job, bundle_name=None, append=False)` | `autoslurm.save_load_jobs` | Persist a single job dict. Creates or appends to `<bundle>_YYYYMMDDhhmmss.json`. |
 | `save_bundle(bundle_dict, name, append=False)` | `autoslurm.save_load_jobs` | Persist multiple jobs at once. |
 | `load_bundle(name)` | `autoslurm.save_load_jobs` | Returns `jobs`, `dependencies`, `date` for the latest bundle. |
 | `submit_jobs(name, machine_config=None, date=None)` | `autoslurm.job_runner` | Converts bundle → SLURM scripts → `sbatch` (local or remote). |
@@ -90,7 +90,7 @@ Agents can import these helpers directly (everything is exposed via
 
 1. **Inspect queued work** – list `jobs/<bundle>_*.json`, parse with Python’s
    `json` module, or call `load_bundle`.
-2. **Modify & re-submit** – edit the JSON (or call `save_job` with `append=True`)
+2. **Modify & re-submit** – edit the JSON (or call `schedule_job` with `append=True`)
    and run `submit_jobs`.
 3. **Register a new CLI target** – add entry points to `pyproject.toml` under
    `[project.scripts]` so `autoslurm-schedule` can discover `<script>-cli`.

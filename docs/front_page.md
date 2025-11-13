@@ -12,7 +12,7 @@ about past and future runs.
 - **Consistent infrastructure hand‑offs** – user-specific paths, accounts, and SSH details stay in config, not in your scripts.
 - **Bundle-level provenance** – every scheduled job is serialized with timestamps, dependencies, and CLI args for later inspection or reruns.
 - **Graph-aware scheduling** – jobs reference each other by name; AutoSlurm resolves the dependency graph and injects the right `--dependency` flags.
-- **Agent-friendly surface area** – the CLI (`autoslurm-schedule`, `autoslurm-submit`, …) mirrors the Python API (`save_job`, `submit_jobs`) so automation can pick the right layer.
+- **Agent-friendly surface area** – the CLI (`autoslurm-schedule`, `autoslurm-submit`, …) mirrors the Python API (`schedule_job`, `submit_jobs`) so automation can pick the right layer.
 
 ## Reference Workflow
 

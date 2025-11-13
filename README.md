@@ -55,7 +55,7 @@ section.
 ### Schedule a job
 
 ```bash
-autoslurm-schedule my-script --name=my-script \
+autoslurm-schedule my-script --bundle=my-script \
     # Application args
     --my_job_arg1=arg1 \
     # SLURM args
@@ -69,8 +69,10 @@ This command schedules `my-script` to run for 1 hour, using 1 CPU, 1 GPU, and
 16GB of memory. Note that both the application-specific arguments and SLURM
 arguments are passed in the same command.
 
-The `--name` argument is optional and is used to specify the name of the job. If
-not provided, the name of the script is used.
+The `--bundle` argument is optional and is used to specify the bundle name (the
+JSON file that stores one or more jobs). If not provided, the script name is
+used. Use `--job_name` if you need to rename the specific job entry within the
+bundle.
 
 ### Submit a job
 
@@ -94,11 +96,11 @@ autoslurm-schedule my-script --submit --machine=machine\
 ### Schedule multiple jobs
 
 Use the `--append` keyword to include additional jobs in a bundle. Use the
-`--name` keyword to specify the name of the bundle.
+`--bundle` keyword to specify the name of the bundle.
 
 ```bash
-autoslurm-schedule job1 --name=my-bundle
-autoslurm-schedule job2 --append --name=my-bundle
+autoslurm-schedule job1 --bundle=my-bundle
+autoslurm-schedule job2 --append --bundle=my-bundle
 ```
 
 You can then submit the bundle using the `autoslurm-submit` command.
@@ -129,13 +131,13 @@ instead of both. This is because the default behavior is to submit the last bund
 Dependencies can be set by specifying the name of the job
 using the `--dependencies` argument.
 ```bash
-autoslurm-schedule job2 --append --name=my-bundle --dependencies job1
+autoslurm-schedule job2 --append --bundle=my-bundle --dependencies job1
 ```
 In this example, `job2` will only be submitted once `job1` has completed.
 
 Multiple dependencies can be added as follows
 ```bash
-autoslurm-schedule job3 --append --name=my-bundle --dependencies job1 job2
+autoslurm-schedule job3 --append --bundle=my-bundle --dependencies job1 job2
 ```
 
 <!--TODO-->

@@ -71,11 +71,11 @@ autoslurm-schedule my-script --submit --machine=machine\
 ### Schedule multiple jobs
 
 Use the `--append` keyword to combine multiple jobs in a bundle. Use the
-`--name` keyword to specify the name of the bundle.
+`--bundle` keyword to specify the name of the bundle.
 
 ```bash
-autoslurm-schedule job1 --name=my-bundle
-autoslurm-schedule job2 --append --name=my-bundle
+autoslurm-schedule job1 --bundle=my-bundle
+autoslurm-schedule job2 --append --bundle=my-bundle
 autoslurm-submit my-bundle
 ```
 
@@ -83,7 +83,7 @@ An empty bundle can be initialized as follows
 ```bash
 autoslurm-initialize my-bundle
 ```
-Jobs can then be appended to this bundle using `autoslurm-schedule --append --name=my-bundle`.
+Jobs can then be appended to this bundle using `autoslurm-schedule --append --bundle=my-bundle`.
 This is useful when you want to schedule jobs in a loop.
 
 **Warning**: In case `--append` is not used, two bundles (each with a single job) are
@@ -96,14 +96,14 @@ Dependencies can be set by specifying the job names in the `--dependencies`
 argument.
 
 ```bash
-autoslurm-schedule job1 --name=my-bundle
-autoslurm-schedule job2 --append --name=my-bundle --dependencies job1
+autoslurm-schedule job1 --bundle=my-bundle
+autoslurm-schedule job2 --append --bundle=my-bundle --dependencies job1
 ```
 
 Multiple dependencies can be set by separating the job names with a space.
 
 ```bash
-autoslurm-schedule job3 --append --name=my-bundle \
+autoslurm-schedule job3 --append --bundle=my-bundle \
     --dependencies job1 job2
 ```
 
@@ -158,12 +158,12 @@ autoslurm-initialize sweep-demo
 
 # Append variants (here preprocessing and three seeds)
 autoslurm-schedule preprocess-data \
-    --append --name sweep-demo \
+    --append --bundle sweep-demo \
     --time 00-30:00 --mem 8G
 
 for seed in 1 2 3; do
   autoslurm-schedule train-model \
-      --append --name sweep-demo \
+      --append --bundle sweep-demo \
       --dependencies preprocess-data \
       --time 04:00:00 --gres gpu:1 --cpus_per_task 8 \
       --seed "$seed" --epochs 50
@@ -180,7 +180,7 @@ the workload later.
 
 ```bash
 autoslurm-schedule inference \
-    --name nightly-inference \
+    --bundle nightly-inference \
     --submit \
     --machine research-gpu \
     --pre-command "source /shared/miniconda3/etc/profile.d/conda.sh; conda activate ldm" \
@@ -195,7 +195,7 @@ stack keeps track of the returned job ID.
 ### Example 3 — Programmatic scheduling from Python
 
 ```python
-from autoslurm.save_load_jobs import save_job
+from autoslurm.save_load_jobs import schedule_job
 from autoslurm.job_runner import submit_jobs
 
 job = {
@@ -205,7 +205,7 @@ job = {
     "slurm": {"time": "00:45:00", "mem": "4G", "cpus_per_task": 2},
 }
 
-save_job(job, bundle_name="analytics", append=True)
+schedule_job(job, bundle_name="analytics", append=True)
 submit_jobs("analytics")  # Uses default machine config unless overridden
 ```
 

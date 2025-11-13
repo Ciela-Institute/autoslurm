@@ -4,7 +4,7 @@ import shlex
 import json
 import sys
 from ..job_runner import submit_jobs
-from ..save_load_jobs import save_job
+from ..save_load_jobs import schedule_job
 from ..utils import machine_config
 
 
@@ -46,7 +46,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Schedule a job for a SLURM cluster.')
 
     parser.add_argument('script',                        help='Name of the script to schedule.')
-    parser.add_argument('--name',   default=None,        help='Name of the job bundle (JSON file containing multiple jobs/scripts to be scheduled). '
+    parser.add_argument('--bundle', default=None,        help='Name of the job bundle (JSON file containing multiple jobs/scripts to be scheduled). '
                                                               'If not provided, the script name is used as the bundle name.')
     parser.add_argument('--job_name', default=None,      help='Name of the job to schedule. If not provided, the script name is used as the job name.')
     parser.add_argument('--append', action='store_true', help='Append the job to an existing bundle. '
@@ -102,9 +102,9 @@ def main():
         },
     }
 
-    name = args.name if args.name is not None else args.script
-    save_job(job, bundle_name=name, append=args.append)
+    bundle = args.bundle if args.bundle is not None else args.script
+    schedule_job(job, bundle_name=bundle, append=args.append)
 
     if args.submit:
         config = machine_config(args)
-        submit_jobs(name, machine_config=config)
+        submit_jobs(bundle, machine_config=config)

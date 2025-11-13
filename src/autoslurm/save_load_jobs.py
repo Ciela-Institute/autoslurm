@@ -14,7 +14,7 @@ import json
 import os
 
 __all__ = [
-    "save_job",
+    "schedule_job",
     "save_bundle",
     "load_bundle",
     "transfer_slurm_to_remote",
@@ -45,7 +45,7 @@ def save_bundle(
     for _, job in bundle.items():
         if not isinstance(job, dict):
             raise TypeError(
-                "Each job in the bundle must be a dictionary. If you want to save a single job, use save_job() instead."
+                "Each job in the bundle must be a dictionary. If you want to save a single job, use schedule_job() instead."
             )
         if "script" not in job:
             raise KeyError(
@@ -56,7 +56,7 @@ def save_bundle(
         for job_name, job in bundle.items():
             if "name" not in job:
                 job["name"] = job_name
-            _, file_path = save_job(job, name, append=True)
+            _, file_path = schedule_job(job, name, append=True)
     else:
         user_config = load_config()
         # Make sure a file with the same date does not exists, otherwise add 1 second to timestamp
@@ -67,7 +67,7 @@ def save_bundle(
                 warnings.warn(
                     "Found a job saved at the same time. "
                     "If you wanted the job to be appended to a bundle instead, "
-                    "use the flags --append and --name=name_of_bundle."
+                    "use the flags --append and --bundle=name_of_bundle."
                 )
                 date += timedelta(seconds=1)
         except FileNotFoundError:
@@ -85,7 +85,7 @@ def save_bundle(
     print(f"Saved bundle {name} to {file_path}")
 
 
-def save_job(
+def schedule_job(
     job: dict,
     bundle_name: Optional[str] = None,
     append: bool = False,
