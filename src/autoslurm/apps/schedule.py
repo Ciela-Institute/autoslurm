@@ -1,44 +1,102 @@
 import argparse
+import re
 import subprocess
-import shlex
-import json
 import sys
+from pathlib import Path
+from typing import Dict, List, Sequence
+
 from ..job_runner import submit_jobs
 from ..save_load_jobs import schedule_job
 from ..utils import machine_config
 
+OPTION_PATTERN = re.compile(r"--[a-zA-Z0-9_-]+")
+VALUE_PATTERN = re.compile(r"\s+([A-Z0-9_\[\]<>-]+)")
+DEFAULT_PATTERN = re.compile(r"default:\s*([^,)]+)", re.IGNORECASE)
+
+
+def _prepare_script_command(script: str) -> List[str]:
+    path = Path(script)
+    if path.is_file():
+        return [sys.executable, str(path)]
+    return [script]
+
+
+def _run_help_command(script: str) -> str:
+    command = _prepare_script_command(script) + ["--help"]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise ValueError(
+            f"Unable to read the help message for {script}. Exit code {result.returncode}."
+        )
+    return result.stdout or result.stderr
+
+
+def _normalize_flag(flag: str) -> str:
+    return flag.lstrip("-").replace("-", "_")
+
+
+def _parse_help_options(help_text: str) -> Dict[str, Dict[str, bool]]:
+    options: Dict[str, Dict[str, bool]] = {}
+    for line in help_text.splitlines():
+        match = OPTION_PATTERN.search(line)
+        if not match:
+            continue
+        option = match.group(0)
+        key = _normalize_flag(option)
+        if key in options:
+            continue
+        rest = line[match.end() :]
+        takes_value = bool(VALUE_PATTERN.match(rest))
+        options[key] = {
+            "takes_value": takes_value,
+            "default": DEFAULT_PATTERN.search(line).group(1)
+            if DEFAULT_PATTERN.search(line)
+            else None,
+        }
+    return options
+
+
+def _parse_unknown_args(
+    options: Dict[str, Dict[str, bool]], unknown_args: Sequence[str]
+) -> Dict[str, bool | str | List[str]]:
+    result: Dict[str, bool | str | List[str]] = {}
+    i = 0
+    length = len(unknown_args)
+    while i < length:
+        token = unknown_args[i]
+        if token == "--":
+            result.setdefault("__positionals__", []).extend(unknown_args[i + 1 :])
+            break
+        if not token.startswith("--"):
+            result.setdefault("__positionals__", []).append(token)
+            i += 1
+            continue
+        if "=" in token:
+            name, value = token.split("=", 1)
+            key = _normalize_flag(name)
+            result[key] = value
+            i += 1
+            continue
+        key = _normalize_flag(token)
+        meta = options.get(key)
+        if meta and not meta["takes_value"]:
+            result[key] = True
+            i += 1
+            continue
+        next_arg = unknown_args[i + 1] if i + 1 < length else None
+        if next_arg is None or next_arg.startswith("--"):
+            result[key] = True
+            i += 1
+            continue
+        result[key] = next_arg
+        i += 2
+    return result
+
 
 def parse_script_args(script, unknown_args) -> dict:
-    # Each argument needs to be properly quoted to handle spaces and special characters
-    prepared_args = [shlex.quote(arg) for arg in unknown_args]
-
-    # Run the job specific CLI parser to validate the arguments
-    command = [f"{script}-cli"] + prepared_args
-    result = subprocess.run(command, capture_output=True, text=True)
-
-    try:  # Try to run the CLI
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        # Capture error and parse it to be more intuitive
-        error_message = (
-            f"Failed to execute command: {' '.join(command)}\n"
-            f"Exit code: {e.returncode}\n"
-            f"Error output: {e.stderr}\n"
-            "Please check the above command and error output to diagnose the issue."
-        )
-        print(error_message)
-        sys.exit(1)
-
-    try:
-        # Load the arguments provided by the CLI parser
-        args_dict = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        raise ValueError(
-            f"Error parsing the output of the {script}-cli command. "
-            f"Please make sure {script}-clip prints its arguments to the command line with the structure of "
-            f"a valid JSON object (e.g. use 'print(json.dumps(vars(args), indent=4))')."
-        )
-    return args_dict
+    help_output = _run_help_command(script)
+    options = _parse_help_options(help_output)
+    return _parse_unknown_args(options, unknown_args)
 
 
 def parse_args():

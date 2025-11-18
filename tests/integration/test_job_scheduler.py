@@ -2,18 +2,21 @@ from unittest.mock import patch, MagicMock
 from autoslurm.apps.schedule import parse_script_args, parse_args, main
 from argparse import Namespace
 import pytest
-import json
-import os
+
+from tests.integration.mocks import mock_load_config
 
 
 @pytest.fixture
 def mock_run():
-    with patch("subprocess.run") as mock_run:
-        # Simulate JSON output as if the CLI application was modified to print arguments as a JSON string
-        args_dict = {"custom_arg1": "value1", "custom_arg2": "value2"}
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout=json.dumps(args_dict, indent=4)
-        )
+    help_output = """usage: job_name [options]
+  --custom_arg1 CUSTOM_ARG1  First argument
+  --custom_arg2 CUSTOM_ARG2  Second argument
+"""
+
+    def _run(cmd, *args, **kwargs):
+        return MagicMock(returncode=0, stdout=help_output)
+
+    with patch("subprocess.run", side_effect=_run) as mock_run:
         yield mock_run
 
 
@@ -60,40 +63,12 @@ def mock_parse_known_args():
         yield mock_parse_known_args
 
 
-@pytest.fixture
-def mock_load_config(monkeypatch, tmp_path):
-    mock_config = {
-        "local": {
-            "path": tmp_path,
-            "env_command": "source /path/to/env/bin/activate",
-            "slurm_account": "def-bengioy",
-        }
-    }
-    os.makedirs(tmp_path / "jobs", exist_ok=True)
-    os.makedirs(tmp_path / "slurm", exist_ok=True)
-
-    # Patch all the instances of load_config to save and load jobs from the tmp_path
-    monkeypatch.setattr("autoslurm.save_load_jobs.load_config", lambda: mock_config)
-    monkeypatch.setattr("autoslurm.job_to_slurm.load_config", lambda: mock_config)
-    monkeypatch.setattr("autoslurm.job_dependency.load_config", lambda: mock_config)
-    monkeypatch.setattr("autoslurm.job_runner.load_config", lambda: mock_config)
-    monkeypatch.setattr("autoslurm.run_slurm.load_config", lambda: mock_config)
-    monkeypatch.setattr("autoslurm.utils.load_config", lambda: mock_config)
-
-    with patch("autoslurm.load_config", return_value=mock_config) as mock_load_config:
-        yield mock_load_config
-
-
 """
 Tests
 """
 
 
 def test_parse_script_args_success(mock_run):
-    """
-    Test that the function returns the job arguments correctly as a dictionary,
-    simulating the behavior of a CLI application outputting JSON.
-    """
     job_args = parse_script_args(
         "job_name", ["--custom_arg1", "value1", "--custom_arg2", "value2"]
     )
@@ -111,26 +86,15 @@ def test_parse_script_args_success(mock_run):
 
 
 def test_schedule_cli(mock_parse_known_args, mock_run):
-    # Adjust the mock to return a JSON string that matches the expected output from the CLI application
-    mock_run.return_value = MagicMock(
-        returncode=0,
-        stdout=json.dumps({"custom_arg1": "value1", "custom_arg2": "value2"}, indent=4),
-    )
     args, job_args = parse_args()
     assert args.script == "job_name"
-    # Parse the JSON string to assert the dictionary contents
-    expected_job_args = job_args
-    assert expected_job_args == {"custom_arg1": "value1", "custom_arg2": "value2"}
+    assert job_args == {"custom_arg1": "value1", "custom_arg2": "value2"}
 
 
 def test_schedule_main(
     mock_submit_job, mock_parse_known_args, mock_run, mock_load_config
 ):
-    # Adjust mock_run to simulate the output from a successful CLI application run
-    mock_run.return_value = MagicMock(
-        returncode=0,
-        stdout=json.dumps({"custom_arg1": "value1", "custom_arg2": "value2"}, indent=4),
-    )
+    # parse_script_args uses the patched subprocess.run fixture, which already returns a help message
     main()
 
     # Modify mock_parse_known_args to simulate --run_now

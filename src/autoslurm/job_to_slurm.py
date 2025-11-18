@@ -19,6 +19,36 @@ def create_slurm_script(job: dict, date: datetime, machine_config: dict) -> str:
     return slurm_name
 
 
+def _format_script_args(job_args: dict) -> list[str]:
+    normalized = []
+    positional = job_args.get("__positionals__", [])
+    for key, value in job_args.items():
+        if key == "__positionals__":
+            continue
+        if value is None:
+            continue
+        flag = key.replace("_", "-")
+        if isinstance(value, bool):
+            if not value:
+                continue
+            normalized.append(f"  --{flag}")
+            continue
+        if isinstance(value, list):
+            if not value:
+                continue
+            normalized.append(f"  --{flag} {' '.join(map(str, value))}")
+            continue
+        normalized.append(f"  --{flag}={value}")
+    normalized.extend(f"  {pos}" for pos in positional)
+    return normalized
+
+
+def _write_script_args(file: TextIOWrapper, job_args: list[str]) -> None:
+    for idx, line in enumerate(job_args):
+        suffix = " \\\n" if idx < len(job_args) - 1 else "\n"
+        file.write(line + suffix)
+
+
 def write_slurm_content(file: TextIOWrapper, job: dict, machine_config: dict) -> None:
     """
     Writes the content of the SLURM script with formatted arguments, handling list arguments differently based on their type.
@@ -50,28 +80,10 @@ def write_slurm_content(file: TextIOWrapper, job: dict, machine_config: dict) ->
         file.write(f"{cmd}\n")
 
     # Main command and arguments
-    file.write(f"{job['script']} \\\n")
     job_args = job.get("script_args", {})
-
-    for i, (k, v) in enumerate(job_args.items()):
-        if v is None:
-            continue
-        if isinstance(v, bool):
-            if v:  # If True, include the flag without '=True'
-                arg_line = f"  --{k}"
-            else:
-                continue
-        elif isinstance(v, list) and all(isinstance(x, (int, float)) for x in v):
-            arg_line = f"  --{k} {' '.join(map(str, v))}"
-        elif isinstance(v, list):
-            arg_line = f"  --{k}"
-            for item in v:
-                arg_line += f" \\\n    {item}"
-        else:
-            arg_line = f"  --{k}={v}"
-
-        if i < len(job_args) - 1:
-            arg_line += " \\\n"
-        else:
-            arg_line += "\n"
-        file.write(arg_line)
+    lines = _format_script_args(job_args)
+    if lines:
+        file.write(f"{job['script']} \\\n")
+        _write_script_args(file, lines)
+    else:
+        file.write(f"{job['script']}\n")

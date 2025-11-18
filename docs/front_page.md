@@ -1,26 +1,15 @@
 # AutoSlurm
 
 `autoslurm` turns repetitive SLURM scripting into a repeatable workflow service.
-You describe *what* to run (Python module, CLI entry point, shell pre-commands)
-alongside the SLURM resources you need, and the toolkit writes, stores, and
-submits the correct `sbatch` payload locally or over SSH. Everything lives in
-structured JSON bundles so humans, CI jobs, or autonomous agents can reason
-about past and future runs.
+You describe what python script to run alongside the resources it need and the toolkit writes, stores, and submits the job locally or over SSH. 
+Autoslurm produces structured JSON files as traces of the jobs so humans, CI jobs, or autonomous agents can reason about past and future runs.
 
 ## Why AutoSlurm?
 
-- **Consistent infrastructure hand‑offs** – user-specific paths, accounts, and SSH details stay in config, not in your scripts.
-- **Bundle-level provenance** – every scheduled job is serialized with timestamps, dependencies, and CLI args for later inspection or reruns.
-- **Graph-aware scheduling** – jobs reference each other by name; AutoSlurm resolves the dependency graph and injects the right `--dependency` flags.
-- **Agent-friendly surface area** – the CLI (`autoslurm-schedule`, `autoslurm-submit`, …) mirrors the Python API (`schedule_job`, `submit_jobs`) so automation can pick the right layer.
-
-## Reference Workflow
-
-1. **Configure once** with `autoslurm-configuration` so the tool knows where your local/remote workspaces live.
-2. **Register CLI entry points** in your project’s `pyproject.toml` so `autoslurm-schedule my-script` can discover arguments.
-3. **Schedule jobs** with resource flags (`--time`, `--gres`, `--mem`, …) plus optional bundles/dependencies.
-4. **Submit later or immediately** (`autoslurm-submit` or `autoslurm-schedule --submit`) to run locally or on named SSH machines.
-5. **Inspect saved bundles** in `$AUTOSLURM/jobs/` or rehydrate them through the Python API for auditing or replays.
+- **Consistent infrastructure** – user-specific paths, accounts, and SSH details are stored once in a configuration file, not in your scripts.
+- **Bundling jobs** – every scheduled job is serialized with timestamps, dependencies, and CLI args for later inspection or reruns.
+- **Handling dependencies automatically** – jobs reference each other by name; AutoSlurm resolves the dependency graph and automatically resolves the Slurm `--dependency` flags for each jobs.
+- **Shell and Python API** – User or agents can schedule jobs via a CLI (`autoslurm-schedule`, `autoslurm-submit`, …) or a Python API (`schedule_job`, `submit_jobs`).
 
 ## How The Docs Are Organized
 
