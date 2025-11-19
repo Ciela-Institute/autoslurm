@@ -12,6 +12,7 @@ import warnings
 import subprocess
 import json
 import os
+from pathlib import Path
 from .storage import ensure_storage_dirs, jobs_dir, slurm_dir
 
 __all__ = [
@@ -119,7 +120,18 @@ def schedule_job(
         )
 
     if "name" not in job:  # If job does not have a name, use the script name
-        job["name"] = job["script"]
+        script_value = job["script"]
+        tokens = script_value.split()
+        candidate = tokens[-1]
+        if candidate.endswith(".py"):
+            job["name"] = Path(candidate).stem
+        elif Path(script_value).suffix:
+            job["name"] = Path(script_value).stem
+        else:
+            job["name"] = script_value
+    # Normalize python script paths without invocation
+    if len(job["script"].split()) == 1 and job["script"].endswith(".py"):
+        job["script"] = f"python {job['script']}"
     job_name = job["name"]
 
     if bundle_name is None:

@@ -4,7 +4,11 @@ from .job_to_slurm import create_slurm_script
 from .job_dependency import update_slurm_with_dependencies
 from .run_slurm import run_slurm_remotely, run_slurm_locally
 from .save_load_jobs import load_bundle, transfer_slurm_to_remote
-from .utils import machine_config as resolve_machine_config
+from .utils import (
+    machine_config as resolve_machine_config,
+    update_job_info_with_id,
+    update_job_metadata,
+)
 
 __all__ = ["submit_jobs"]
 
@@ -61,5 +65,8 @@ def submit_jobs(
             job_id = run_slurm_locally(slurm_name)
             print(f"Submitted job {job['name']} with ID {job_id} locally")
 
+        job_metadata = {"machine": machine}
+        update_job_metadata(name, date, job["name"], job_metadata)
         for dependent_job_name in dependencies.get(job["name"], []):
             update_slurm_with_dependencies(slurm_names[dependent_job_name], job_id)
+        update_job_info_with_id(name, date, job["name"], job_id)

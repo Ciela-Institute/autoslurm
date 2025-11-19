@@ -12,6 +12,8 @@ from datetime import datetime
 import json
 import os
 import pytest
+from autoslurm.job_to_slurm import create_slurm_script
+from autoslurm.storage import slurm_dir
 from autoslurm.storage import jobs_dir, ensure_storage_dirs
 
 """
@@ -139,6 +141,50 @@ def test_save_load_job(tmp_path, mock_load_config):
     assert len(jobs) == 3
     assert len(dependencies) == 3
     assert dependencies == {"JobA": ["JobB", "JobC"], "JobB": ["JobC"], "JobC": []}
+
+
+def test_job_name_from_script_path(tmp_path, mock_load_config):
+    bundle_name = "python_path"
+    script_path = tmp_path / "scripts" / "train.py"
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+    script_path.write_text("#!/usr/bin/env python\nprint('ok')")
+
+    job = {
+        "script": f"python {script_path}",
+        "slurm": {"time": "00:10:00", "mem": "2G", "cpus_per_task": 1},
+    }
+
+    _, job_file = schedule_job(job, bundle_name=bundle_name)
+    stored = json.load(open(job_file))
+    stored_job = next(iter(stored.values()))
+    assert stored_job["name"] == "train"
+
+    jobs, _, date = load_bundle(bundle_name)
+    machine_cfg = {"env_command": "source env", "slurm_account": "account"}
+    slurm_name = create_slurm_script(jobs[0], date, machine_cfg)
+    script_content = (slurm_dir() / slurm_name).read_text()
+    assert f"python {script_path}" in script_content
+
+
+@pytest.mark.parametrize(
+    "script_value, expected_script, expected_name",
+    [
+        ("python /full/path/train.py", "python /full/path/train.py", "train"),
+        ("/full/path/train.py", "python /full/path/train.py", "train"),
+        ("train", "train", "train"),
+    ],
+)
+def test_job_naming_variants(tmp_path, mock_load_config, script_value, expected_script, expected_name):
+    bundle_name = "path_variant"
+    job = {
+        "script": script_value,
+        "slurm": {"time": "00:10:00", "mem": "1G", "cpus_per_task": 1},
+    }
+    _, job_file = schedule_job(job, bundle_name=bundle_name)
+    stored = json.load(open(job_file))
+    stored_job = next(iter(stored.values()))
+    assert stored_job["name"] == expected_name
+    assert stored_job["script"] == expected_script
 
 
 def test_load_job_topological_sorting(tmp_path, mock_load_config):

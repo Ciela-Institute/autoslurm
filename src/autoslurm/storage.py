@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-__all__ = ["storage_root", "jobs_dir", "slurm_dir", "ensure_storage_dirs", "set_storage_root"]
+__all__ = ["storage_root", "jobs_dir", "slurm_dir", "out_dir", "ensure_storage_dirs", "set_storage_root"]
 
 _override_root: Path | None = None
 
@@ -29,6 +29,10 @@ def slurm_dir() -> Path:
     return storage_root() / "slurm"
 
 
+def out_dir() -> Path:
+    return storage_root() / "out"
+
+
 def ensure_storage_dirs() -> None:
-    for path in (jobs_dir(), slurm_dir()):
+    for path in (jobs_dir(), slurm_dir(), out_dir()):
         path.mkdir(parents=True, exist_ok=True)

@@ -195,6 +195,8 @@ This creates a two-job bundle where `train-model` will only start after
 job names inside the bundle, so you can split preprocessing, training, and
 evaluation into their own stages while keeping a single submission command.
 
+If you pass `path/to/script.py` directly to `autoslurm-schedule`, AutoSlurm prepends `python ` to the invocation and derives the job name from the script’s basename (dropping `.py`). Use `--job-name` whenever you want a custom identity, otherwise duplicates automatically receive `_001`, `_002`, etc., inside the same bundle.
+
 ### Example 3 — Remote submission with environment activation
 
 ```bash
@@ -231,3 +233,22 @@ submit_jobs("analytics")  # Uses default machine unless overrides are provided
 Use this API when another service (for example, an LLM agent) needs to stage
 jobs without invoking the CLI. The saved bundle mirrors the CLI format, so you
 can mix and match tooling safely.
+
+## Inspecting experiment outputs
+
+Agents often need a single textual snapshot of what happened during a bundle.
+Use `autoslurm-experiment-context <bundle>` (optionally `--date` to target a
+specific timestamp) to dump:
+
+1. The bundle JSON that AutoSlurm persisted under `$AUTOSLURM/jobs`.
+2. Every rendered SLURM script found in `$AUTOSLURM/slurm`.
+3. The `.out` logs currently under `$AUTOSLURM/out`. If the job ran remotely,
+   the command will SSH into the recorded machine, run the same CLI remotely
+   inside the configured environment, and pull the logs back into `out/` so
+   they appear in the dump as well.
+
+This workflow is designed for agents that are tracing experiments end-to-end,
+but it is also convenient when a human wants to quickly peek at the scripts and
+logs produced by a run without diving into the filesystem manually. When no
+`.out` files exist yet, the output clearly states whether the job has not been
+submitted or (if there is a recorded job ID) that the logs are missing.

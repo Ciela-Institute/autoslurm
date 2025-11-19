@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "patternProperties": {
+    "^.+$": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "script": {"type": "string"},
+        "script_args": {"type": "object"},
+        "dependencies": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "pre_commands": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "slurm": {
+          "type": "object",
+          "properties": {
+            "time": {"type": "string"},
+            "cpus_per_task": {"type": "integer"},
+            "gres": {"type": "string"},
+            "mem": {"type": "string"},
+            "tasks": {"type": "integer"},
+            "array": {"type": "string"}
+          },
+          "additionalProperties": true
+        }
+      },
+      "required": ["name", "script", "slurm"]
+    }
+  },
+  "additionalProperties": false
+}

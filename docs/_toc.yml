@@ -6,8 +6,3 @@ chapters:
   - file: ssh_configuration
   - file: register_script
   - file: cli_integration
-  #- part: Agent Guide
-    #chapters:
-      #- file: agent/index
-      #- file: agent/package_map
-  #-file: remote_machine

@@ -61,7 +61,7 @@ def write_slurm_content(file: TextIOWrapper, job: dict, machine_config: dict) ->
     if slurm_account:
         file.write(f"#SBATCH --account={slurm_account}\n")
     remote_storage = machine_config.get("path", "~/.autoslurm")
-    output_dir = os.path.join(remote_storage, "slurm")
+    output_dir = os.path.join(remote_storage, "out")
     file.write(f"#SBATCH --output={os.path.join(output_dir, '%x-%j.out')}\n")
     file.write(f"#SBATCH --job-name={job['name']}\n")
 
