@@ -130,6 +130,7 @@ Everything hinges on these directories inside the configured `$AUTOSLURM` path:
 | `autoslurm-schedule <script>` | `autoslurm.apps.schedule` | Validate script arguments (via `<script>-cli`), persist job(s), optionally submit immediately. | Accepts SLURM args, machine overrides, dependencies, pre-commands. |
 | `autoslurm-submit <bundle>` | `autoslurm.apps.submit` | Load the latest bundle matching `<bundle>_*` and call `submit_jobs`. | Can point at remote machines via `--machine` or inline SSH params. |
 | `autoslurm-experiment-context <bundle>` | `autoslurm.apps.experiment_context` | Dump the bundle JSON, rendered SLURM scripts, and matching `.out` logs (optional `--date`). | Designed for agents to reason about experiments (remotely fetches logs). |
+| `autoslurm-agent-context` | `autoslurm.apps.agent_context` | Print every agent doc/script as one string so downstream tools can consume the guidance, examples, and schema in a single call. |
 
 ## Python surface area
 
@@ -143,6 +144,7 @@ Everything hinges on these directories inside the configured `$AUTOSLURM` path:
 | `run_slurm_locally(slurm_name)` / `run_slurm_remotely(slurm_name, machine_config)` | `autoslurm.run_slurm` | Execute `sbatch` and capture the job ID. |
 | `update_slurm_with_dependencies(slurm_name, job_ids)` | `autoslurm.job_dependency` | Inject `#SBATCH --dependency=afterok:` entries after upstream jobs complete. |
 | `experiment_context(bundle_name, desired_date=None)` | `autoslurm.experiment_context` | Returns a single concatenated string (bundle JSON + SLURM scripts + logs, fetching remote `.out` files if needed) that agents can ingest directly. |
+| `execute_acp(payload)` | `autoslurm.acp` | Parse a minimal ACP payload (`action`, `bundle`, `job`, etc.) and route requests to context/list/scheduling helpers so tools have one entry point. |
 
 Agents can import these helpers directly (`import autoslurm`) when they need tighter control than the CLI provides.
 
