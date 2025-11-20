@@ -1,6 +1,6 @@
 from pathlib import Path
 from textwrap import dedent
-from typing import List
+from typing import Iterable, List, Optional
 
 
 AGENT_FOLDER = Path(__file__).resolve().parent.parent.parent / "agent"
@@ -30,11 +30,22 @@ def _render_file(path: Path) -> str:
     return f"## {relative}\n```{fence}\n{path.read_text()}```"
 
 
-def agent_context() -> str:
+def _matches_selectors(path: Path, selectors: Iterable[str]) -> bool:
+    rel = path.relative_to(AGENT_FOLDER)
+    text = str(rel).lower()
+    return any(selector.lower() in text for selector in selectors)
+
+
+def agent_context(sections: Optional[List[str]] = None) -> str:
     """
     Load the agent helpers (project map, examples, etc.) as a single chunk of text.
     """
-    parts = [_render_file(path) for path in _ordered_agent_files()]
+    ordered = _ordered_agent_files()
+    if sections:
+        ordered = [
+            path for path in ordered if _matches_selectors(path, sections)
+        ]
+    parts = [_render_file(path) for path in ordered]
     return dedent("\n\n".join(parts)).strip()
 
 

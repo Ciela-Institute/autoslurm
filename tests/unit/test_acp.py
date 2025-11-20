@@ -57,7 +57,7 @@ def test_execute_acp_list_returns_metadata():
     _create_job(bundle, job_name="first")
     _create_job(bundle, job_name="second")
 
-    response = execute_acp({"action": "list", "bundle": bundle})
+    response = execute_acp({"action": "list_experiments", "bundle": bundle})
 
     assert response["status"] == "success"
     result = response["result"]
@@ -72,7 +72,7 @@ def test_execute_acp_context_includes_out_log():
     log_path = out_dir() / f"{job['name']}-42.out"
     log_path.write_text("done")
 
-    response = execute_acp({"action": "context", "bundle": bundle})
+    response = execute_acp({"action": "inspect_experiments", "bundle": bundle})
 
     assert response["status"] == "success"
     assert job["name"] in response["result"]
@@ -80,8 +80,16 @@ def test_execute_acp_context_includes_out_log():
 
 
 def test_execute_acp_agent_docs_action():
-    response = execute_acp({"action": "agent_docs"})
+    response = execute_acp(
+        {"action": "gather_context", "sections": ["09_task_inspect.md"]}
+    )
 
     assert response["status"] == "success"
-    assert "01_context_overview.md" in response["result"]
-    assert "01_simple_job.sh" in response["result"]
+    assert "Task: Inspect Experiments" in response["result"]
+
+
+def test_execute_acp_gather_context_task():
+    response = execute_acp({"action": "gather_context", "task": "schedule"})
+
+    assert response["status"] == "success"
+    assert "Task: Plan & Schedule Jobs" in response["result"]

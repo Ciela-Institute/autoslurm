@@ -9,17 +9,17 @@ This doc describes how LLM-based agents consume context produced by AutoSlurm an
 3. **Bundles/logs on disk (`jobs/`, `slurm/`, `out/`)** – agents can read the JSON files and logs directly if they have filesystem access; the context helper and docs describe the naming (`bundle_timestamp`) and how to pick a bundle based on name/date.
 4. **Configuration metadata** – the `~/.autoslurmconfig` layout and machine definitions (described in docs) help agents understand where to submit jobs and how to SSH into remote machines.
 
-These pieces combine to give an LLM a human-readable narrative (docs) plus machine-state snapshots (bundles + experiment context) so decisions can be made in a single turn.
+These pieces combine to give an LLM a human-readable narrative (docs) plus machine-state snapshots (bundles + experiment context) so decisions can be made in a single turn. The new task-specific summaries (`09_task_inspect.md`, `10_task_schedule.md`, `11_task_submit_monitor.md`, `12_task_acp_reference.md`) pull together only the sections needed for each role so you can keep prompts short.
 
 ## Tooling roadmap for agents
 
 Agents currently only consume context. The next step is to expose tools that allow them to drive AutoSlurm via a minimal Agent Communication Protocol (ACP) layer:
 
 1. **`execute_acp` wrapper** – the new `autoslurm.acp.execute_acp(...)` function parses an ACP payload (see below) and routes requests to `experiment_context`, `list_bundles`, or `schedule_job`. Wrapping it in a tool gives agents one entry point for observation and staging.
-2. **`experiment_context(bundle[, date])` tool** – the ACP already returns the concatenated bundle/SLURM/scripts/logs string, so this tool can simply call `execute_acp({"action": "context", ...})`.
+2. **`experiment_context(bundle[, date])` tool** – the ACP already returns the concatenated bundle/SLURM/scripts/logs string, so this tool can simply call `execute_acp({"action": "inspect_experiments", ...})`.
 3. **`agent_context()` helper** – the new `autoslurm-agent-context` CLI (and Python `agent_context()` API) emit the entire `agent/` folder in one string. Agents can keep this handy reference when they need structural guidance or want to import docs into their context window.
-4. **`agent_docs` action** – `{"action": "agent_docs"}` hits the same helper as `autoslurm-agent-context`, so tools that already talk to the ACP can grab the agent docs without a separate CLI call.
-5. **`list_bundles(name)` tool** – provided by the ACP (`{"action": "list"}`), it enumerates available bundle timestamps and job names so agents can choose what to inspect or resubmit.
+4. **`gather_context` action** – `{"action": "gather_context"}` hits the same helper as `autoslurm-agent-context`, so tools that already talk to the ACP can grab the agent docs without a separate CLI call. Provide a `task` name (e.g., `schedule` or `inspect_experiments`) to automatically gather the matching task summary sections before issuing the ACP.
+5. **`list_bundles(name)` tool** – provided by the ACP (`{"action": "list_experiments"}`), it enumerates available bundle timestamps and job names so agents can choose what to inspect or resubmit.
 6. **`schedule_job` tool** – backstops scheduling through the ACP's `{"action": "schedule"}` request, taking a structured job dict (script, args, slurm, bundle, append flag) and returning the bundle file written.
 7. **Future tools** – `submit_jobs`, log fetching, or cancellation can be added later by extending the ACP dispatch table.
 

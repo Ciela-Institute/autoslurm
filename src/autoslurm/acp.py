@@ -69,12 +69,23 @@ def list_bundles(bundle_name: str) -> List[Dict[str, Any]]:
     return entries
 
 
+def _sections_for_task(task: str) -> List[str]:
+    matches = []
+    for action in ACTION_DEFINITIONS.values():
+        keywords = action.get("keywords", [])
+        sections = action.get("context_sections", [])
+        if task == action["name"] or task in keywords:
+            matches.extend(sections)
+    return sorted(dict.fromkeys(matches))
+
+
 def execute_acp(acl: Dict[str, Any]) -> Dict[str, Any]:
     """
     Execute an Agent Communication Protocol request.
 
-    The `acl` dict must include an `"action"` key (one of `context`, `list`,
-    `schedule`). Each action defines its own parameters. The return value is a
+    The `acl` dict must include an `"action"` key (one of `inspect_experiments`,
+    `list_experiments`, `schedule`, `gather_context`). Each action defines its
+    own parameters. The return value is a
     dict with keys `status` and either `result` or `message`.
     """
     action = acl.get("action")
@@ -82,15 +93,19 @@ def execute_acp(acl: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "message": "Missing action"}
 
     try:
-        if action == "context":
+        if action == "inspect_experiments":
             bundle = acl["bundle"]
             date = _parse_date(acl.get("date"))
             payload = experiment_context(bundle, date)
             return {"status": "success", "result": payload}
-        if action == "agent_docs":
-            payload = agent_context()
+        if action == "gather_context":
+            selectors = acl.get("sections")
+            task = acl.get("task")
+            if not selectors and task:
+                selectors = _sections_for_task(task)
+            payload = agent_context(sections=selectors)
             return {"status": "success", "result": payload}
-        if action == "list":
+        if action == "list_experiments":
             bundle = acl["bundle"]
             result = list_bundles(bundle)
             return {"status": "success", "result": result}
