@@ -1,4 +1,7 @@
+from pathlib import Path
 import os
+import json
+import sys
 import pytest
 from unittest.mock import patch, MagicMock
 from autoslurm import save_bundle, submit_jobs
@@ -121,3 +124,43 @@ print(\"Hello from an unregistered script!\")
         "Hello from an unregistered script!" in call["stdout"]
         for call in slurm_emulator
     )
+
+
+def test_submit_jobs_from_bundle_file(
+    tmp_path, mock_load_config, slurm_emulator, storage_env
+):
+    script_path = (
+        Path(__file__).resolve().parent.parent / "scripts" / "example_python_script.py"
+    )
+    bundle_path = tmp_path / "transfer_alpha_bundle.json"
+    job_name = "bundle_file_job"
+    bundle = {
+        job_name: {
+            "name": job_name,
+            "script": f"{sys.executable} {script_path}",
+            "script_args": {
+                "dataset": "/tmp/galaxies",
+                "epochs": "5",
+                "learning_rate": "1e-3",
+            },
+            "dependencies": [],
+            "pre_commands": [],
+            "slurm": {
+                "tasks": 1,
+                "cpus_per_task": 1,
+                "mem": "1G",
+                "time": "00:01:00",
+            },
+        }
+    }
+    bundle_path.write_text(json.dumps(bundle))
+
+    submit_jobs(
+        "transfer-alpha",
+        machine="local",
+        machine_overrides=mock_machine_config_local,
+        bundle_path=bundle_path,
+    )
+
+    assert slurm_emulator, "The SLURM emulator did not record any executed scripts."
+    assert any("/tmp/galaxies" in call["stdout"] for call in slurm_emulator)

@@ -1,9 +1,15 @@
 from typing import Optional
 from datetime import datetime
+import json
+from pathlib import Path
 from .job_to_slurm import create_slurm_script
 from .job_dependency import update_slurm_with_dependencies
 from .run_slurm import run_slurm_remotely, run_slurm_locally
-from .save_load_jobs import load_bundle, transfer_slurm_to_remote
+from .save_load_jobs import (
+    load_bundle,
+    save_bundle,
+    transfer_slurm_to_remote,
+)
 from .utils import (
     machine_config as resolve_machine_config,
     update_job_info_with_id,
@@ -18,6 +24,7 @@ def submit_jobs(
     machine: Optional[str] = None,
     machine_overrides: Optional[dict] = None,
     date: Optional[datetime] = None,
+    bundle_path: Optional[str | Path] = None,
 ):
     """
     Run a job with SLURM either locally or on a remote machine. This is the main function of the scheduler module.
@@ -41,7 +48,13 @@ def submit_jobs(
     else:
         host = machine_config.get("hostname", machine_config.get("hosturl"))
 
-    jobs, dependencies, date = load_bundle(name)
+    if bundle_path is None:
+        jobs, dependencies, date = load_bundle(name)
+    else:
+        with open(bundle_path, "r") as file:
+            bundle = json.load(file)
+        save_bundle(bundle, name)
+        jobs, dependencies, date = load_bundle(name)
     slurm_names = {}
     for job in jobs:
         if job.get("script", None) is None:

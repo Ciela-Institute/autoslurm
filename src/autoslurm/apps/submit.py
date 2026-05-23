@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 from ..utils import machine_config
 from ..job_runner import submit_jobs
 
@@ -43,6 +44,12 @@ def parse_args():
         required=False,
         help="SLURM account to use for job submission",
     )
+    parser.add_argument(
+        "--bundle-file",
+        required=False,
+        type=Path,
+        help="Explicit path to a JSON bundle file to submit instead of loading from AutoSlurm storage.",
+    )
 
     return parser.parse_args()
 
@@ -50,4 +57,9 @@ def parse_args():
 def main():
     args = parse_args()
     machine_name, config = machine_config(args)
-    submit_jobs(args.name, machine=machine_name, machine_overrides=config)
+    submit_jobs(
+        args.name,
+        machine=machine_name,
+        machine_overrides=config,
+        bundle_path=args.bundle_file,
+    )

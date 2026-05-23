@@ -1,5 +1,6 @@
 from autoslurm.save_load_jobs import (
     load_bundle,
+    load_bundle_from_path,
     schedule_job,
     save_bundle,
     transfer_slurm_to_remote,
@@ -220,6 +221,22 @@ def test_load_job_file_not_found(tmp_path, mock_load_config):
     assert "No files found" in str(
         excinfo.value
     )  # Test that our error message is being triggered
+
+
+def test_load_bundle_from_path(tmp_path, mock_load_config):
+    bundle_path = tmp_path / "bundle.json"
+    bundle_data = {
+        "JobA": {"dependencies": [], "script": "run-joba"},
+        "JobB": {"dependencies": ["JobA"], "script": "run-jobb"},
+    }
+    bundle_path.write_text(json.dumps(bundle_data))
+
+    jobs, dependencies, date = load_bundle_from_path(bundle_path)
+
+    assert dependencies == {"JobA": ["JobB"], "JobB": []}
+    assert jobs[0]["name"] == "JobA"
+    assert jobs[1]["name"] == "JobB"
+    assert isinstance(date, datetime)
 
 
 def test_save_append_jobs_to_bundle(tmp_path, mock_load_config):

@@ -19,6 +19,7 @@ __all__ = [
     "schedule_job",
     "save_bundle",
     "load_bundle",
+    "load_bundle_from_path",
     "transfer_slurm_to_remote",
     "nearest_bundle_filename",
 ]
@@ -223,6 +224,8 @@ def order_jobs(jobs, sorted_names):
     jobs_list = []
     for name in sorted_names:
         job = jobs[name]
+        if job.get("name") is None:
+            job["name"] = name
         jobs_list.append(job)
     return jobs_list
 
@@ -267,6 +270,34 @@ def load_bundle(
     jobs = order_jobs(jobs, sorted_job_names)
 
     return jobs, dependencies, date
+
+
+def load_bundle_from_path(
+    bundle_path: str | Path,
+) -> tuple[list, dict, datetime]:
+    """
+    Load a bundle from an explicit JSON file path.
+
+    This is the path-based counterpart to :func:`load_bundle`, which looks up
+    bundles by name under the AutoSlurm storage root.
+    """
+    ensure_storage_dirs()
+    file_path = Path(bundle_path)
+    if not file_path.is_file():
+        raise FileNotFoundError(f"Bundle file not found: {file_path}")
+
+    with open(file_path, "r") as file:
+        try:
+            jobs = json.load(file)
+        except json.JSONDecodeError:
+            raise OSError(
+                f"Error decoding the job bundle file {file_path}. Make sure it is a valid JSON file."
+            )
+
+    dependencies = dependency_graph(jobs)
+    sorted_job_names = tuple(TopologicalSorter(dependencies).static_order())[::-1]
+    jobs = order_jobs(jobs, sorted_job_names)
+    return jobs, dependencies, datetime.fromtimestamp(file_path.stat().st_mtime)
 
 
 def nearest_bundle_filename(
