@@ -3,7 +3,7 @@ import socket
 import pytest
 from unittest.mock import patch, MagicMock
 from autoslurm.apps.configuration import main
-from autoslurm.storage import jobs_dir, slurm_dir
+from autoslurm.storage import jobs_dir, slurm_dir, storage_root
 
 EXAMPLE_CONFIG = {
     "local": {
@@ -34,7 +34,7 @@ EXAMPLE_CONFIG = {
 def setup_mock_subprocess_run():
     def mock_subprocess_run(cmd, *args, **kwargs):
         assert cmd[0] == "ssh"
-        assert cmd[2].startswith("mkdir -p ~/.autoslurm/")
+        assert cmd[2].startswith(f"mkdir -p {storage_root()}/")
         return MagicMock(returncode=0, stderr="")
 
     return mock_subprocess_run

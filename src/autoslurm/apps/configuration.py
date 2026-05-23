@@ -9,7 +9,7 @@ from typing import Dict, Optional
 
 from ..definitions import CONFIG_FILE_PATH
 from ..utils import load_config, ssh_host_from_config
-from ..storage import ensure_storage_dirs
+from ..storage import ensure_storage_dirs, storage_root
 
 
 
@@ -60,9 +60,9 @@ def _remote_machine_actions(machine: Dict, name: str):
     if not check_host(hostname):
         print(f"Unable to resolve hostname for {name}. Skipping setup.")
         return
-    # Create directories on the remote machine at ~/.autoslurm
+    remote_root = machine.get("path") or str(storage_root())
     for directory in ("jobs", "slurm", "out"):
-        remote_dir = os.path.join("~/.autoslurm", directory)
+        remote_dir = os.path.join(remote_root, directory)
         ssh_command = ["ssh", hostname, f"mkdir -p {remote_dir}"]
         result = subprocess.run(ssh_command, capture_output=True, text=True)
         if result.returncode != 0:

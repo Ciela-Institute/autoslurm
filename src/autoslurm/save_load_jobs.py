@@ -13,7 +13,7 @@ import subprocess
 import json
 import os
 from pathlib import Path
-from .storage import ensure_storage_dirs, jobs_dir, slurm_dir
+from .storage import ensure_storage_dirs, jobs_dir, slurm_dir, storage_root
 
 __all__ = [
     "schedule_job",
@@ -205,7 +205,7 @@ def transfer_slurm_to_remote(
             )
     if machine_config is None:
         raise ValueError("Either machine_name or machine_config must be specified")
-    remote_path = machine_config.get("path", "~/.autoslurm")
+    remote_path = machine_config.get("path") or str(storage_root())
     # Transfer the script to the remote machine
     remote_script_path = os.path.join(remote_path, "slurm", slurm_name)
     hostname, key_path = scp_host_and_keypath_from_config(machine_config, machine_name)
