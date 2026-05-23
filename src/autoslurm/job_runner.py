@@ -8,6 +8,7 @@ from .run_slurm import run_slurm_remotely, run_slurm_locally
 from .save_load_jobs import (
     load_bundle,
     save_bundle,
+    transfer_bundle_to_remote,
     transfer_slurm_to_remote,
 )
 from .utils import (
@@ -83,3 +84,6 @@ def submit_jobs(
         for dependent_job_name in dependencies.get(job["name"], []):
             update_slurm_with_dependencies(slurm_names[dependent_job_name], job_id)
         update_job_info_with_id(name, date, job["name"], job_id)
+
+    if machine_config.get("hostname") or machine_config.get("hosturl"):
+        transfer_bundle_to_remote(name, date, machine_config=machine_config)

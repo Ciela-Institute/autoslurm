@@ -4,9 +4,11 @@ from .definitions import DATE_FORMAT, MACHINE_KEYS
 from datetime import datetime
 import os
 import json
+import shlex
+import subprocess
 
 
-__all__ = ["load_config", "machine_config"]
+__all__ = ["load_config", "machine_config", "remote_storage_root_from_config"]
 
 
 def name_slurm_script(job: dict, date: datetime):
@@ -191,3 +193,32 @@ def scp_host_and_keypath_from_config(
     else:
         key_path = ""
     return hostname, key_path
+
+
+def remote_storage_root_from_config(
+    machine_config: dict, machine_name: Optional[str] = None
+) -> str:
+    hostname = ssh_host_from_config(machine_config, machine_name)
+    env_command = machine_config.get("env_command", "").strip()
+    python_probe = "from autoslurm.storage import storage_root; print(storage_root())"
+    command_parts = []
+    if env_command:
+        command_parts.append(env_command)
+    command_parts.append(f"python -c {shlex.quote(python_probe)}")
+    remote_command = " && ".join(command_parts)
+    result = subprocess.run(
+        ["ssh", *shlex.split(hostname), f"bash -lc {shlex.quote(remote_command)}"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        message = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(
+            f"Unable to determine remote storage root for machine '{machine_name or ''}': {message}"
+        )
+    remote_root = result.stdout.strip()
+    if not remote_root:
+        raise RuntimeError(
+            f"Unable to determine remote storage root for machine '{machine_name or ''}': empty response"
+        )
+    return remote_root

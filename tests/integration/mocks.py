@@ -120,6 +120,15 @@ def setup_mock_subprocess_run() -> Callable:
     mock_run_instance = MagicMock()
 
     def mock_run(cmd, *args, **kwargs):
+        if isinstance(cmd, list) and cmd:
+            if cmd[0] == "scp":
+                mock_run_instance.return_value.stdout = ""
+                mock_run_instance.return_value.returncode = 0
+                return mock_run_instance.return_value
+            if cmd[0] == "ssh" and cmd[-1].startswith("mkdir -p "):
+                mock_run_instance.return_value.stdout = ""
+                mock_run_instance.return_value.returncode = 0
+                return mock_run_instance.return_value
         job = os.path.split(cmd[-1])[-1]
         job_name = job.split("_")[-2].split(".")[0]
         job_id = mock_job_ids[job_name]

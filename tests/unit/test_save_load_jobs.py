@@ -370,6 +370,39 @@ def test_transfer_script_to_remote(
     }
 
     transfer_slurm_to_remote("test_job", machine_config=mock_machine_config)
+    assert mock_ssh.called
+    command = mock_ssh.call_args.args[0]
+    assert command[0] == "scp"
+    assert str(command[1]).endswith("/storage/slurm/test_job")
+    assert command[2] == "testhost:/path/to/remote/slurm/test_job"
+
+
+def test_transfer_script_to_remote_probes_remote_root_when_path_missing(
+    tmp_path, monkeypatch, mock_job_script
+):
+    calls = []
+
+    def fake_run(cmd, *args, **kwargs):
+        calls.append(cmd)
+        if cmd[0] == "ssh":
+            return MagicMock(returncode=0, stdout="/remote/autoslurm\n", stderr="")
+        if cmd[0] == "scp":
+            return MagicMock(returncode=0, stdout="", stderr="")
+        raise AssertionError(f"Unexpected command: {cmd}")
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    mock_machine_config = {
+        "hostname": "testhost",
+        "username": "testuser",
+        "key_path": "testkey",
+    }
+
+    transfer_slurm_to_remote("test_job", machine_config=mock_machine_config)
+
+    assert any(cmd[0] == "ssh" for cmd in calls)
+    scp_cmd = next(cmd for cmd in calls if cmd[0] == "scp")
+    assert scp_cmd[2] == "testhost:/remote/autoslurm/slurm/test_job"
 
 
 def test_transfer_script_to_remote_no_config_raises_error(mock_load_config):

@@ -3,7 +3,6 @@ from io import StringIO
 from autoslurm.job_to_slurm import write_slurm_content
 from unittest.mock import patch
 import os
-from autoslurm.storage import set_storage_root, storage_root
 
 
 @pytest.fixture
@@ -124,8 +123,19 @@ def test_write_slurm_output_dir_customization(mock_load_config):
     ), "Custom output directory setting failed"
 
 
-def test_write_slurm_defaults_to_storage_root_when_path_missing(tmp_path):
-    set_storage_root(tmp_path / "autoslurm")
+def test_write_slurm_uses_remote_storage_root_when_path_missing(monkeypatch):
+    from unittest.mock import MagicMock
+
+    calls = []
+
+    def fake_run(cmd, *args, **kwargs):
+        calls.append(cmd)
+        if cmd[0] == "ssh":
+            return MagicMock(returncode=0, stdout="/remote/autoslurm\n", stderr="")
+        raise AssertionError(f"Unexpected command: {cmd}")
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
     job = {
         "name": "default_output_dir_test",
         "slurm": {},
@@ -133,10 +143,15 @@ def test_write_slurm_defaults_to_storage_root_when_path_missing(tmp_path):
         "script": "test-default-output-dir-application",
     }
     file = StringIO()
-    machine_config = {"env_command": "source activate test-env"}
+    machine_config = {
+        "hostname": "testhost",
+        "username": "testuser",
+        "env_command": "source activate test-env",
+        "slurm_account": "test-account",
+    }
 
     write_slurm_content(file, job, machine_config)
 
     content = file.getvalue()
-    expected_root = storage_root()
-    assert f"#SBATCH --output={expected_root / 'out' / '%x-%j.out'}" in content
+    assert "#SBATCH --output=/remote/autoslurm/out/%x-%j.out" in content
+    assert any(cmd[0] == "ssh" for cmd in calls)

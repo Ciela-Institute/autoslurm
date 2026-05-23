@@ -52,6 +52,36 @@ def test_run_slurm_remotely(mock_ssh, mock_load_config):
     assert job_id == "12345"
 
 
+def test_run_slurm_remotely_probes_remote_root_when_path_missing(
+    monkeypatch, mock_load_config
+):
+    calls = []
+
+    def fake_run(cmd, *args, **kwargs):
+        calls.append(cmd)
+        if cmd[0] == "ssh" and cmd[-1].startswith("bash -lc "):
+            return MagicMock(returncode=0, stdout="/remote/autoslurm\n", stderr="")
+        if cmd[0] == "ssh":
+            return MagicMock(returncode=0, stdout="Submitted batch job 12345\n", stderr="")
+        raise AssertionError(f"Unexpected command: {cmd}")
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    mock_machine_config = {
+        "hostname": "testhost",
+        "username": "testuser",
+        "key_path": "testkey",
+        "env_command": "source /path/to/venv/bin/activate",
+    }
+
+    job_id = run_slurm_remotely("remote_script.sh", machine_config=mock_machine_config)
+
+    assert job_id == "12345"
+    sbatch_calls = [cmd for cmd in calls if cmd[0] == "ssh" and cmd[-1].startswith("sbatch ")]
+    assert sbatch_calls
+    assert "/remote/autoslurm/slurm/remote_script.sh" in sbatch_calls[0][-1]
+
+
 @patch("subprocess.run")
 def test_run_slurm_locally(mock_run, mock_load_config):
     # Setup mock behavior

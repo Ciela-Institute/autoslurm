@@ -3,7 +3,7 @@ import re
 import shlex
 import subprocess
 from typing import Optional
-from .utils import load_config, ssh_host_from_config
+from .utils import load_config, ssh_host_from_config, remote_storage_root_from_config
 from .storage import ensure_storage_dirs, slurm_dir, storage_root
 
 __all__ = ["get_job_id_from_sbatch_output", "run_slurm_remotely", "run_slurm_locally"]
@@ -39,7 +39,9 @@ def run_slurm_remotely(
             raise EnvironmentError(f"No configuration found for machine: {machine}")
 
     hostname = ssh_host_from_config(machine_config, machine)
-    remote_path = machine_config.get("path") or str(storage_root())
+    remote_path = machine_config.get("path") or remote_storage_root_from_config(
+        machine_config, machine
+    )
     script_path = os.path.join(remote_path, "slurm", slurm_name)
     ssh_command = ["ssh", *shlex.split(hostname), f"sbatch {script_path}"]
 

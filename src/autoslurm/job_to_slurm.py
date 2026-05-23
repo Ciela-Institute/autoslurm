@@ -3,6 +3,7 @@ from io import TextIOWrapper
 from datetime import datetime
 from .utils import name_slurm_script
 from .storage import ensure_storage_dirs, slurm_dir, storage_root
+from .utils import remote_storage_root_from_config
 
 
 __all__ = ["create_slurm_script"]
@@ -60,7 +61,12 @@ def write_slurm_content(file: TextIOWrapper, job: dict, machine_config: dict) ->
     file.write("#!/bin/bash\n")
     if slurm_account:
         file.write(f"#SBATCH --account={slurm_account}\n")
-    remote_storage = machine_config.get("path") or str(storage_root())
+    if machine_config.get("path"):
+        remote_storage = machine_config.get("path")
+    elif machine_config.get("hostname") or machine_config.get("hosturl"):
+        remote_storage = remote_storage_root_from_config(machine_config)
+    else:
+        remote_storage = str(storage_root())
     output_dir = os.path.join(remote_storage, "out")
     file.write(f"#SBATCH --output={os.path.join(output_dir, '%x-%j.out')}\n")
     file.write(f"#SBATCH --job-name={job['name']}\n")
