@@ -27,6 +27,10 @@ __all__ = [
 ]
 
 
+def _is_placeholder_file(path: Path) -> bool:
+    return path.name.startswith(".")
+
+
 def save_bundle(
     bundle: dict,
     name: str,
@@ -318,6 +322,8 @@ def list_saved_bundles(
 
     entries: list[dict] = []
     for filename in jobs_dir().glob("*.json"):
+        if _is_placeholder_file(filename):
+            continue
         stem = filename.stem
         if "_" not in stem:
             continue
@@ -359,6 +365,8 @@ def latest_bundle_summaries(desired_date: Optional[datetime] = None) -> list[dic
 
     latest_by_name: dict[str, dict] = {}
     for filename in jobs_dir().glob("*.json"):
+        if _is_placeholder_file(filename):
+            continue
         stem = filename.stem
         if "_" not in stem:
             continue
@@ -402,7 +410,7 @@ def nearest_bundle_filename(
     files = [
         f[:-5]
         for f in os.listdir(directory)
-        if f.startswith(name) and f.endswith(".json")
+        if not f.startswith(".") and f.startswith(name) and f.endswith(".json")
     ]
     if not files:
         raise FileNotFoundError(

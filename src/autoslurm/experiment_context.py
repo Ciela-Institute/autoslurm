@@ -78,7 +78,11 @@ def _run_slurm_query(command: list[str], machine_name: Optional[str]) -> subproc
         return subprocess.run(command, capture_output=True, text=True)
 
     remote_command = " ".join(shlex.quote(part) for part in command)
-    return subprocess.run(["ssh", hostname, remote_command], capture_output=True, text=True)
+    return subprocess.run(
+        ["ssh", *shlex.split(hostname), remote_command],
+        capture_output=True,
+        text=True,
+    )
 
 
 def _bundle_summary_lines(desired_date: Optional[datetime] = None) -> list[str]:
@@ -232,7 +236,7 @@ def _fetch_remote_logs_for_job(
         return [], str(exc)
 
     result = subprocess.run(
-        ["ssh", hostname, remote_command], capture_output=True, text=True
+        ["ssh", *shlex.split(hostname), remote_command], capture_output=True, text=True
     )
     if result.returncode != 0:
         message = result.stderr.strip() or result.stdout.strip()

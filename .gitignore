@@ -159,6 +159,10 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-src/jobs/*
-src/out/*
-src/slurm/*
+config.json
+jobs/*
+!jobs/.gitkeep
+slurm/*
+!slurm/.gitkeep
+out/*
+!out/.gitkeep

@@ -1,14 +1,14 @@
 import argparse
 import json
 import os
-import socket
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, Optional
 
 from ..utils import load_config, ssh_host_from_config
-from ..storage import ensure_storage_dirs, storage_root, config_file_path
+from ..storage import config_file_path
 
 
 
@@ -33,50 +33,79 @@ def _refresh_config_aliases(config: Dict[str, Dict]):
         config[name] = machine
 
 
-def check_host(hostname):
-    try:
-        socket.gethostbyname(hostname)
-    except socket.gaierror:
-        return False
-    return True
-
-
 def _is_remote(machine: Dict) -> bool:
     return any(key in machine for key in ("hostname", "hosturl", "username"))
 
 
-def _local_machine_actions():
-    ensure_storage_dirs()
+def _remote_ssh_command(machine: Dict, name: str, remote_command: str) -> list[str]:
+    hostname = ssh_host_from_config(machine, name)
+    return ["ssh", *shlex.split(hostname), remote_command]
 
 
-def _remote_machine_actions(machine: Dict, name: str):
-    try:
-        hostname = ssh_host_from_config(machine, name)
-    except AttributeError as exc:
-        print(f"Skipping {name}: {exc}")
-        return
-    if not check_host(hostname):
-        print(f"Unable to resolve hostname for {name}. Skipping setup.")
-        return
-    remote_root = machine.get("path") or str(storage_root())
-    for directory in ("jobs", "slurm", "out"):
-        remote_dir = os.path.join(remote_root, directory)
-        ssh_command = ["ssh", hostname, f"mkdir -p {remote_dir}"]
-        result = subprocess.run(ssh_command, capture_output=True, text=True)
+def _validation_shell_command(machine: Dict) -> str:
+    python_probe = "import autoslurm; print(autoslurm.__file__)"
+    python_command = f"python -c {shlex.quote(python_probe)}"
+    env_command = machine.get("env_command", "").strip()
+    if env_command:
+        shell_command = f"{env_command} && {python_command}"
+    else:
+        shell_command = python_command
+    return shell_command
+
+
+def _validate_machine(machine: Dict, name: str) -> bool:
+    if _is_remote(machine):
+        ssh_probe = _remote_ssh_command(machine, name, "true")
+        result = subprocess.run(ssh_probe, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"Error creating {remote_dir} on remote machine {name}.")
-            print(f"Error message: {result.stderr}")
-        else:
-            print(f"Remote directory ensured: {remote_dir}")
+            print(f"SSH connectivity check failed for '{name}'.")
+            message = result.stderr.strip() or result.stdout.strip()
+            if message:
+                print(message)
+            return False
+        print(f"SSH connectivity check passed for '{name}'.")
+
+        validation_command = _validation_shell_command(machine)
+        result = subprocess.run(
+            _remote_ssh_command(
+                machine, name, f"bash -lc {shlex.quote(validation_command)}"
+            ),
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(f"Python environment check failed for '{name}'.")
+            message = result.stderr.strip() or result.stdout.strip()
+            if message:
+                print(message)
+            return False
+        print(f"Python environment check passed for '{name}'.")
+        output = result.stdout.strip()
+        if output:
+            print(output)
+        return True
+
+    validation_command = _validation_shell_command(machine)
+    result = subprocess.run(["bash", "-lc", validation_command], capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Python environment check failed for '{name}'.")
+        message = result.stderr.strip() or result.stdout.strip()
+        if message:
+            print(message)
+        return False
+    print(f"Python environment check passed for '{name}'.")
+    output = result.stdout.strip()
+    if output:
+        print(output)
+    return True
 
 
-def _setup_all_machines(config: Dict):
-    for name, machine in config["machines"].items():
-        print(f"\nConfiguring machine '{name}':")
-        if _is_remote(machine):
-            _remote_machine_actions(machine, name)
-        else:
-            _local_machine_actions()
+def _validate_machine_selection(config: Dict):
+    name = _select_machine(config, "Choose a machine to validate:")
+    if not name:
+        return
+    machine = config["machines"][name]
+    _validate_machine(machine, name)
 
 def _prompt_text(prompt: str, default: Optional[str] = None, required: bool = False) -> str:
     suffix = f" [{default}]" if default else ""
@@ -216,6 +245,23 @@ def _update_machine(config: Dict):
     _save_config(config)
 
 
+def _rename_machine(config: Dict):
+    old_name = _select_machine(config, "Choose a machine to rename:")
+    if not old_name:
+        return
+    new_name = _prompt_text("New machine name", default=old_name, required=True)
+    if new_name == old_name:
+        return
+    if new_name in config["machines"]:
+        print(f"A machine named '{new_name}' already exists. Choose another name.")
+        return
+    config["machines"][new_name] = config["machines"].pop(old_name)
+    if config["default_machine"] == old_name:
+        config["default_machine"] = new_name
+    _refresh_config_aliases(config)
+    _save_config(config)
+
+
 def _change_default_machine(config: Dict):
     name = _select_machine(config, "Choose a machine to become the default:")
     if not name:
@@ -241,13 +287,14 @@ def _set_default_machine_by_name(config: Dict, name: str):
 
 def _create_default_machine():
     print("No configuration file detected. Let's configure the default machine.")
-    config = {"machines": {}, "default_machine": "local"}
+    config = {"machines": {}, "default_machine": ""}
+    name = _prompt_machine_name(config)
     machine = _prompt_machine_details()
-    config["machines"]["local"] = machine
+    config["machines"][name] = machine
+    config["default_machine"] = name
     _refresh_config_aliases(config)
     _save_config(config)
     print("Default machine configured.")
-    _setup_all_machines(config)
     return config
 
 
@@ -260,20 +307,26 @@ def _menu_loop(config: Dict):
         print("\nSelect an option:")
         print("  1) Update an existing machine")
         print("  2) Add a new machine")
-        print("  3) Change the default machine")
-        print("  4) Exit")
+        print("  3) Rename a machine")
+        print("  4) Change the default machine")
+        print("  5) Validate a machine")
+        print("  6) Exit")
         choice = input("Choice: ").strip()
         if choice == "1":
             _update_machine(config)
         elif choice == "2":
             _create_machine(config)
         elif choice == "3":
-            _change_default_machine(config)
+            _rename_machine(config)
         elif choice == "4":
+            _change_default_machine(config)
+        elif choice == "5":
+            _validate_machine_selection(config)
+        elif choice == "6":
             print("Configuration complete.")
             break
         else:
-            print("Please choose a valid option (1-4).")
+            print("Please choose a valid option (1-6).")
 
 
 def display_config():
@@ -286,9 +339,26 @@ def display_config():
     print(json.dumps(data, indent=4))
 
 
+def display_config_summary():
+    path = config_file_path()
+    if not os.path.exists(path):
+        print("No configuration found.")
+        return
+    config = load_config()
+    for name, machine in config["machines"].items():
+        machine_type = "remote" if _is_remote(machine) else "local"
+        slurm_account = machine.get("slurm_account", "")
+        print(f"{name} {machine_type} {slurm_account}")
+
+
 def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(description="Configure AutoSlurm machines and view the stored config.")
     parser.add_argument("--view", action="store_true", help="Print the current configuration file and exit.")
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print a short machine summary and exit.",
+    )
     parser.add_argument(
         "--interactive",
         action="store_true",
@@ -309,6 +379,10 @@ def main(argv: list[str] | None = None):
         display_config()
         return
 
+    if args.summary:
+        display_config_summary()
+        return
+
     if args.interactive:
         if not os.path.exists(config_file_path()):
             _create_default_machine()
@@ -320,7 +394,6 @@ def main(argv: list[str] | None = None):
             _create_default_machine()
             return
         _menu_loop(config)
-        _setup_all_machines(config)
         return
 
     if args.set_default:
@@ -342,4 +415,3 @@ def main(argv: list[str] | None = None):
         _create_default_machine()
         return
     _menu_loop(config)
-    _setup_all_machines(config)

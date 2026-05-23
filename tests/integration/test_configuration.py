@@ -1,5 +1,4 @@
 import json
-import socket
 import pytest
 from unittest.mock import patch, MagicMock
 from autoslurm.apps.configuration import main
@@ -34,38 +33,26 @@ EXAMPLE_CONFIG = {
 def setup_mock_subprocess_run():
     def mock_subprocess_run(cmd, *args, **kwargs):
         assert cmd[0] == "ssh"
-        assert cmd[2].startswith(f"mkdir -p {storage_root()}/")
+        assert cmd[-1].startswith(f"mkdir -p {storage_root()}/")
         return MagicMock(returncode=0, stderr="")
 
     return mock_subprocess_run
 
 
-@pytest.mark.parametrize("hostname_resolvable", [True, False])
-def test_autoslurm_configuration(
-    hostname_resolvable,
-    tmp_path,
-    monkeypatch,
-):
+def test_autoslurm_configuration(tmp_path, monkeypatch):
     from autoslurm.storage import set_storage_root, ensure_storage_dirs
     storage_root = tmp_path / "storage"
     set_storage_root(storage_root)
     ensure_storage_dirs()
 
-    with patch("builtins.input", return_value="4"), patch(
-        "socket.gethostbyname"
-    ) as mock_gethostbyname, patch("subprocess.run") as mock_run:
-        if hostname_resolvable:
-            mock_gethostbyname.return_value = "127.0.0.1"
-        else:
-            mock_gethostbyname.side_effect = socket.gaierror
-        mock_run.side_effect = setup_mock_subprocess_run()
+    with patch("builtins.input", return_value="6"), patch("subprocess.run") as mock_run:
 
         config_path = config_file_path()
         with open(config_path, "w") as f:
             json.dump(EXAMPLE_CONFIG, f)
 
         monkeypatch.setattr("sys.argv", ["autoslurm-configuration"])
-        main()
+        main(["--interactive"])
 
     assert jobs_dir().exists(), "Jobs directory should be created under storage root."
     assert slurm_dir().exists(), "SLURM directory should be created under storage root."
@@ -109,6 +96,123 @@ def test_autoslurm_configuration_set_default_machine(
     assert updated["default_machine"] == "remote"
 
 
+def test_autoslurm_configuration_summary(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    from autoslurm.storage import set_storage_root, ensure_storage_dirs
+
+    storage = tmp_path / "storage"
+    set_storage_root(storage)
+    ensure_storage_dirs()
+
+    config_path = config_file_path()
+    config = {
+        "machines": {
+            "local": {
+                "env_command": "source /path/to/local/venv/bin/activate",
+                "slurm_account": "def-bengioy",
+            },
+            "remote": {
+                "env_command": "source /path/to/remote/venv/bin/activate",
+                "slurm_account": "rrg-account_name",
+                "hostname": "machine",
+            },
+        },
+        "default_machine": "local",
+    }
+    with open(config_path, "w") as file:
+        json.dump(config, file)
+
+    main(["--summary"])
+    output = capsys.readouterr().out.strip().splitlines()
+
+    assert "local local def-bengioy" in output
+    assert "remote remote rrg-account_name" in output
+
+
+def test_autoslurm_configuration_rename_machine(
+    tmp_path,
+    monkeypatch,
+):
+    from autoslurm.storage import set_storage_root, ensure_storage_dirs
+
+    storage = tmp_path / "storage"
+    set_storage_root(storage)
+    ensure_storage_dirs()
+
+    config_path = config_file_path()
+    config = {
+        "machines": {
+            "local": {
+                "env_command": "source /path/to/local/venv/bin/activate",
+                "slurm_account": "def-bengioy",
+            },
+            "remote": {
+                "env_command": "source /path/to/remote/venv/bin/activate",
+                "slurm_account": "rrg-account_name",
+                "hostname": "machine",
+            },
+        },
+        "default_machine": "local",
+    }
+    with open(config_path, "w") as file:
+        json.dump(config, file)
+
+    answers = iter(["3", "2", "cluster", "6"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: MagicMock(returncode=0, stderr=""))
+
+    main(["--interactive"])
+
+    updated = json.loads(config_path.read_text())
+    assert "cluster" in updated["machines"]
+    assert "remote" not in updated["machines"]
+    assert updated["default_machine"] == "local"
+
+
+def test_autoslurm_configuration_validate_remote_machine(
+    tmp_path,
+    monkeypatch,
+):
+    from autoslurm.storage import set_storage_root, ensure_storage_dirs
+
+    storage = tmp_path / "storage"
+    set_storage_root(storage)
+    ensure_storage_dirs()
+
+    config_path = config_file_path()
+    config = {
+        "machines": {
+            "remote": {
+                "env_command": "source /path/to/remote/venv/bin/activate",
+                "slurm_account": "rrg-account_name",
+                "hostname": "rorqual",
+            }
+        },
+        "default_machine": "remote",
+    }
+    with open(config_path, "w") as file:
+        json.dump(config, file)
+
+    def mock_subprocess_run(cmd, *args, **kwargs):
+        assert cmd[0] == "ssh"
+        if cmd[-1] == "true":
+            return MagicMock(returncode=0, stdout="", stderr="")
+        if cmd[-1].startswith("bash -lc "):
+            return MagicMock(returncode=0, stdout="/path/to/autoslurm/__init__.py\n", stderr="")
+        if cmd[-1].startswith(f"mkdir -p {storage_root()}/"):
+            return MagicMock(returncode=0, stdout="", stderr="")
+        raise AssertionError(f"Unexpected command: {cmd}")
+
+    answers = iter(["5", "1", "6"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    monkeypatch.setattr("subprocess.run", mock_subprocess_run)
+
+    main(["--interactive"])
+
+
 def test_autoslurm_configuration_interactive_creates_config(
     tmp_path,
     monkeypatch,
@@ -120,13 +224,13 @@ def test_autoslurm_configuration_interactive_creates_config(
 
     answers = iter(
         [
+            "rorqual",
             "source /path/to/venv/bin/activate",
             "def-bengioy",
             "n",
         ]
     )
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
-    monkeypatch.setattr("socket.gethostbyname", lambda host: "127.0.0.1")
     monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: MagicMock(returncode=0, stderr=""))
 
     main(["--interactive"])

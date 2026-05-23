@@ -1,5 +1,6 @@
 import os
 import re
+import shlex
 import subprocess
 from typing import Optional
 from .utils import load_config, ssh_host_from_config
@@ -40,7 +41,7 @@ def run_slurm_remotely(
     hostname = ssh_host_from_config(machine_config, machine)
     remote_path = machine_config.get("path") or str(storage_root())
     script_path = os.path.join(remote_path, "slurm", slurm_name)
-    ssh_command = ["ssh", hostname, f"sbatch {script_path}"]
+    ssh_command = ["ssh", *shlex.split(hostname), f"sbatch {script_path}"]
 
     # Run the sbatch command on the remote machine
     result = subprocess.run(ssh_command, capture_output=True, text=True)
