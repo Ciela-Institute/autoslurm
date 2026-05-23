@@ -12,6 +12,7 @@ shell scripts and provides the following features:
   - Job configurations saved in a human-readable format (JSON)
   - Automated Job scheduling and submission
 - Bundling and submitting multiple jobs together with a single command
+- Inspecting bundle/job status and reading the latest SLURM output from the CLI
 - Dependency between jobs managed using names instead of SLURM specific job IDs
 - Submitting jobs remotely across SSH connections
 
@@ -91,6 +92,28 @@ schedule and submit a job at the same time to skip a step.
 autoslurm-schedule my-script --submit --machine=machine\
     # Application and SLURM args
     ...
+```
+
+### Inspect jobs and logs
+
+Use `autoslurm context` to inspect scheduled bundles without dumping the full
+bundle JSON by default.
+
+```bash
+autoslurm context
+autoslurm context my-bundle
+autoslurm context my-bundle --job my-job --status
+autoslurm context my-bundle --job my-job --logs
+autoslurm context --latest-log
+```
+
+This prints compact bundle and job summaries, SLURM status for a selected job,
+or the newest `.out` log when you need to check a run quickly.
+
+You can also submit the most recently saved bundle directly:
+
+```bash
+autoslurm submit --latest
 ```
 
 ### Schedule multiple jobs
