@@ -107,3 +107,28 @@ def test_autoslurm_configuration_set_default_machine(
 
     updated = json.loads(config_path.read_text())
     assert updated["default_machine"] == "remote"
+
+
+def test_autoslurm_configuration_interactive_creates_config(
+    tmp_path,
+    monkeypatch,
+):
+    from autoslurm.storage import set_storage_root
+
+    storage = tmp_path / "storage"
+    set_storage_root(storage)
+
+    answers = iter(
+        [
+            "source /path/to/venv/bin/activate",
+            "def-bengioy",
+            "n",
+        ]
+    )
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    monkeypatch.setattr("socket.gethostbyname", lambda host: "127.0.0.1")
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: MagicMock(returncode=0, stderr=""))
+
+    main(["--interactive"])
+
+    assert config_file_path().exists()

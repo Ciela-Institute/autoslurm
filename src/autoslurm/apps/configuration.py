@@ -290,6 +290,11 @@ def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(description="Configure AutoSlurm machines and view the stored config.")
     parser.add_argument("--view", action="store_true", help="Print the current configuration file and exit.")
     parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Open the interactive machine configuration flow.",
+    )
+    parser.add_argument(
         "--set-default",
         help="Set the default machine by name and exit.",
     )
@@ -302,6 +307,20 @@ def main(argv: list[str] | None = None):
 
     if args.view:
         display_config()
+        return
+
+    if args.interactive:
+        if not os.path.exists(config_file_path()):
+            _create_default_machine()
+            return
+        try:
+            config = load_config()
+        except EnvironmentError:
+            print("Found an invalid configuration file. Creating a fresh default configuration.")
+            _create_default_machine()
+            return
+        _menu_loop(config)
+        _setup_all_machines(config)
         return
 
     if args.set_default:
