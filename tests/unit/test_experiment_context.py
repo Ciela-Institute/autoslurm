@@ -1,10 +1,11 @@
 import os
 import importlib
+import json
 import pytest
 
 from autoslurm.experiment_context import experiment_context
 from autoslurm.save_load_jobs import nearest_bundle_filename, save_bundle
-from autoslurm.storage import out_dir, slurm_dir
+from autoslurm.storage import ensure_storage_dirs, jobs_dir, out_dir, set_storage_root, slurm_dir
 from autoslurm.utils import name_slurm_script
 
 
@@ -89,8 +90,6 @@ def test_experiment_context_reports_unstarted_job():
 
 
 def test_context_latest_log_prints_newest_out_file(tmp_path, capsys):
-    from autoslurm.storage import ensure_storage_dirs, set_storage_root
-
     set_storage_root(tmp_path / "storage")
     ensure_storage_dirs()
 
@@ -126,3 +125,44 @@ def test_context_latest_log_prints_newest_out_file(tmp_path, capsys):
     output = capsys.readouterr().out.strip()
 
     assert output == "newer log"
+
+
+def test_context_latest_log_without_bundle_prints_latest_saved_out_file(tmp_path, capsys):
+    set_storage_root(tmp_path / "storage")
+    ensure_storage_dirs()
+
+    first_log = out_dir() / "bundle_a_job-1.out"
+    second_log = out_dir() / "bundle_b_job-2.out"
+    first_log.write_text("older storage log")
+    second_log.write_text("newest storage log")
+    older = 1_700_000_000
+    newer = older + 10
+    os.utime(first_log, (older, older))
+    os.utime(second_log, (newer, newer))
+
+    from autoslurm.apps import experiment_context as experiment_context_app
+
+    experiment_context_app.main(["--latest-log"])
+    output = capsys.readouterr().out.strip()
+
+    assert output == "newest storage log"
+
+
+def test_context_latest_prints_latest_bundle_status(tmp_path, capsys):
+    set_storage_root(tmp_path / "storage")
+    ensure_storage_dirs()
+
+    (jobs_dir() / "job_a_20250102000000.json").write_text(
+        json.dumps({"job_a": {"script": "run-a"}})
+    )
+    (jobs_dir() / "job_b_20250103000000.json").write_text(
+        json.dumps({"job_b": {"script": "run-b"}})
+    )
+
+    from autoslurm.apps import experiment_context as experiment_context_app
+
+    experiment_context_app.main(["--latest"])
+    output = capsys.readouterr().out.splitlines()
+
+    assert output[0].startswith("job_b ")
+    assert any(line.startswith("job_b status=") for line in output)

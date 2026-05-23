@@ -300,17 +300,44 @@ def _latest_out_log_for_bundle(
     return latest[3], None
 
 
+def _latest_out_log_in_storage() -> tuple[Optional[str], Optional[str]]:
+    latest: Optional[tuple[float, Path]] = None
+    for log_path in out_dir().glob("*.out"):
+        try:
+            timestamp = log_path.stat().st_mtime
+        except OSError:
+            continue
+        if latest is None or timestamp > latest[0]:
+            latest = (timestamp, log_path)
+
+    if latest is None:
+        return None, None
+
+    content = _read_text(latest[1])
+    if content is None:
+        return None, f"Unable to read latest log file '{latest[1].name}'."
+    return content, None
+
+
+def _latest_bundle_jobs_context(desired_date: Optional[datetime] = None) -> str:
+    summaries = latest_bundle_summaries(desired_date=desired_date)
+    if not summaries:
+        return "No saved bundles found."
+    bundle_name = summaries[0]["bundle"]
+    return bundle_jobs_context(bundle_name, desired_date)
+
+
 def latest_log_context(
     bundle_name: Optional[str] = None,
     desired_date: Optional[datetime] = None,
 ) -> str:
     if bundle_name is None:
-        summaries = latest_bundle_summaries(desired_date)
-        if not summaries:
-            return "No saved bundles found."
-        bundle_name = max(summaries, key=lambda entry: entry["date"])["bundle"]
-        if desired_date is None:
-            desired_date = max(summaries, key=lambda entry: entry["date"])["date"]
+        content, error = _latest_out_log_in_storage()
+        if content is not None:
+            return content
+        if error is not None:
+            return error
+        return "No logs found."
 
     content, error = _latest_out_log_for_bundle(bundle_name, desired_date)
     if content is not None:
@@ -318,6 +345,10 @@ def latest_log_context(
     if error is not None:
         return f"No logs found for bundle '{bundle_name}': {error}"
     return f"No logs found for bundle '{bundle_name}'."
+
+
+def latest_bundle_status_context(desired_date: Optional[datetime] = None) -> str:
+    return _latest_bundle_jobs_context(desired_date)
 
 
 def experiment_context(bundle_name: str, desired_date: Optional[datetime] = None) -> str:

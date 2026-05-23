@@ -9,6 +9,7 @@ from ..experiment_context import (
     bundle_index_context,
     bundle_jobs_context,
     experiment_context,
+    latest_bundle_status_context,
     latest_log_context,
     job_context,
 )
@@ -130,6 +131,11 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Print the newest .out file for the selected bundle, or the newest bundle overall if no bundle is given.",
     )
+    parser.add_argument(
+        "--latest",
+        action="store_true",
+        help="Print the compact status view for the latest saved bundle.",
+    )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -160,11 +166,18 @@ def main(argv=None) -> None:
         parser.error("--job requires a bundle name.")
     if (args.script or args.logs or args.status) and not args.job:
         parser.error("--script, --logs, and --status require --job.")
+    if args.latest and any(
+        (args.list, args.job, args.script, args.logs, args.status, args.full, args.latest_log)
+    ):
+        parser.error("--latest cannot be combined with other context output flags.")
     if args.latest_log and any(
         (args.list, args.job, args.script, args.logs, args.status, args.full)
     ):
         parser.error("--latest-log cannot be combined with other context output flags.")
 
+    if args.latest:
+        print(latest_bundle_status_context(reference_date))
+        return
     if args.latest_log:
         print(latest_log_context(args.bundle, reference_date))
         return
