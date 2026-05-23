@@ -86,6 +86,9 @@ def load_config() -> dict:
     EnvironmentError: If the configuration file is not found.
     """
     path = config_file_path()
+    legacy_path = path.parent / "src" / path.name
+    if not path.exists() and legacy_path.exists():
+        path = legacy_path
     if not path.exists():
         raise EnvironmentError(
             f"Configuration file not found at {path}. Please use `autoslurm configuration` to create the configurations for autoslurm."

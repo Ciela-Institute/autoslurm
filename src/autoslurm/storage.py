@@ -21,7 +21,7 @@ def set_storage_root(path: Path):
 def _root() -> Path:
     if _override_root is not None:
         return _override_root
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parent.parent.parent
 
 
 def storage_root() -> Path:
