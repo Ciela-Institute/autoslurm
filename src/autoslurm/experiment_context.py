@@ -18,6 +18,7 @@ __all__ = [
     "experiment_context",
     "bundle_index_context",
     "bundle_jobs_context",
+    "latest_log_context",
     "job_context",
 ]
 
@@ -266,6 +267,57 @@ def _collect_out_logs(
         bundle_name, bundle_date, job_name, job_machine
     )
     return fetched_logs, error
+
+
+def _latest_out_log_for_bundle(
+    bundle_name: str, desired_date: Optional[datetime] = None
+) -> tuple[Optional[str], Optional[str]]:
+    jobs, _, bundle_date = load_bundle(bundle_name, desired_date)
+    latest: Optional[tuple[float, str, str, str]] = None
+    errors: list[str] = []
+
+    for job in jobs:
+        job_name = job["name"]
+        logs, error = _collect_out_logs(
+            job_name, bundle_name, bundle_date, job.get("machine")
+        )
+        if error:
+            errors.append(error)
+            continue
+        for log_path, content in logs:
+            try:
+                timestamp = log_path.stat().st_mtime
+            except OSError:
+                timestamp = bundle_date.timestamp()
+            candidate = (timestamp, job_name, log_path.name, content)
+            if latest is None or candidate > latest:
+                latest = candidate
+
+    if latest is None:
+        if errors:
+            return None, errors[0]
+        return None, None
+    return latest[3], None
+
+
+def latest_log_context(
+    bundle_name: Optional[str] = None,
+    desired_date: Optional[datetime] = None,
+) -> str:
+    if bundle_name is None:
+        summaries = latest_bundle_summaries(desired_date)
+        if not summaries:
+            return "No saved bundles found."
+        bundle_name = max(summaries, key=lambda entry: entry["date"])["bundle"]
+        if desired_date is None:
+            desired_date = max(summaries, key=lambda entry: entry["date"])["date"]
+
+    content, error = _latest_out_log_for_bundle(bundle_name, desired_date)
+    if content is not None:
+        return content
+    if error is not None:
+        return f"No logs found for bundle '{bundle_name}': {error}"
+    return f"No logs found for bundle '{bundle_name}'."
 
 
 def experiment_context(bundle_name: str, desired_date: Optional[datetime] = None) -> str:

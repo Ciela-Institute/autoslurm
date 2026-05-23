@@ -1,3 +1,4 @@
+import os
 import importlib
 import pytest
 
@@ -85,3 +86,43 @@ def test_experiment_context_reports_unstarted_job():
     context = experiment_context(bundle_name)
 
     assert "job 'pending_task' has not been submitted yet" in context
+
+
+def test_context_latest_log_prints_newest_out_file(tmp_path, capsys):
+    from autoslurm.storage import ensure_storage_dirs, set_storage_root
+
+    set_storage_root(tmp_path / "storage")
+    ensure_storage_dirs()
+
+    bundle_name = "latest_log_experiment"
+    bundle = {
+        "analysis": {
+            "name": "analysis",
+            "script": "python train.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        },
+        "cleanup": {
+            "name": "cleanup",
+            "script": "python cleanup.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        },
+    }
+
+    save_bundle(bundle, bundle_name)
+    capsys.readouterr()
+
+    first_log = out_dir() / "analysis-1.out"
+    second_log = out_dir() / "cleanup-2.out"
+    first_log.write_text("older log")
+    second_log.write_text("newer log")
+    older = 1_700_000_000
+    newer = older + 10
+    os.utime(first_log, (older, older))
+    os.utime(second_log, (newer, newer))
+
+    from autoslurm.apps import experiment_context as experiment_context_app
+
+    experiment_context_app.main(["--latest-log"])
+    output = capsys.readouterr().out.strip()
+
+    assert output == "newer log"
