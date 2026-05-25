@@ -220,3 +220,31 @@ def test_write_slurm_keeps_absolute_output_dir_unchanged():
         "--output-dir=/lustre10/scratch/aadam/substructure_lens/results/run_003"
         in content
     )
+
+
+def test_write_slurm_resolves_declared_path_args_with_results_root():
+    job = {
+        "name": "relative_declared_paths_job",
+        "slurm": {},
+        "path_args": ["jacobian_h5"],
+        "script_args": {
+            "output_dir": "substructure_lens/results/run_004",
+            "jacobian_h5": "substructure_lens/results/build_jacobian/key/jacobian_block.h5",
+        },
+        "script": "test-app",
+    }
+    file = StringIO()
+    machine_config = {
+        "path": "/remote/autoslurm",
+        "env_command": "source activate test-env",
+        "slurm_account": "test-account",
+        "results_root": "/lustre10/scratch/aadam",
+    }
+
+    write_slurm_content(file, job, machine_config)
+    content = file.getvalue()
+    assert "--output-dir=/lustre10/scratch/aadam/substructure_lens/results/run_004" in content
+    assert (
+        "--jacobian-h5=/lustre10/scratch/aadam/substructure_lens/results/build_jacobian/key/jacobian_block.h5"
+        in content
+    )

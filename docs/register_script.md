@@ -33,3 +33,29 @@ Without this, the entry point does not exist and submissions will fail.
 When you register a script, AutoSlurm runs it via the entry point in [project.scripts] instead of a hardcoded filesystem location. 
 That avoids differences between local/remote paths and makes it safe to rename files or reorganize the source tree.
 Just keep the pyproject file up-to-date.
+
+## Path argument standard (portable bundles)
+
+For machine-portable reruns, prefer **relative** paths in job `script_args`.
+AutoSlurm rewrites relative paths to machine-specific absolute paths at SLURM script generation time.
+
+Standard fields:
+- `output_dir` is always treated as a path argument and normalized automatically.
+- Additional path-like arguments should be declared explicitly via `path_args` in the job payload.
+
+Example:
+
+```json
+{
+  "script": "substructure-lens-transfer-function",
+  "path_args": ["output_dir", "jacobian_h5"],
+  "script_args": {
+    "output_dir": "substructure_lens/results/transfer_production/...",
+    "jacobian_h5": "substructure_lens/results/build_jacobian/.../jacobian_block.h5"
+  }
+}
+```
+
+Rules:
+- relative path values in declared `path_args` are resolved against the machine `results_root` (or `<storage>/results` fallback),
+- absolute path values are left unchanged.

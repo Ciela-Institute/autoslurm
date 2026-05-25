@@ -47,21 +47,27 @@ def _format_script_args(job_args: dict) -> list[str]:
 
 
 def _normalize_script_args(
-    job_args: dict, machine_config: dict, remote_storage: str
+    job_args: dict,
+    machine_config: dict,
+    remote_storage: str,
+    path_args: list[str] | tuple[str, ...] | None = None,
 ) -> dict:
     normalized = dict(job_args)
-    output_dir = normalized.get("output_dir")
-    if not isinstance(output_dir, str) or output_dir.strip() == "":
-        return normalized
-    output_path = PurePosixPath(output_dir)
-    if output_path.is_absolute():
-        return normalized
+    declared = set(path_args or [])
+    declared.add("output_dir")
     results_root = machine_config.get("results_root")
     if isinstance(results_root, str) and results_root.strip():
         base = PurePosixPath(results_root)
     else:
         base = PurePosixPath(remote_storage) / "results"
-    normalized["output_dir"] = str(base / output_path)
+    for key in declared:
+        value = normalized.get(key)
+        if not isinstance(value, str) or value.strip() == "":
+            continue
+        as_path = PurePosixPath(value)
+        if as_path.is_absolute():
+            continue
+        normalized[key] = str(base / as_path)
     return normalized
 
 
@@ -102,7 +108,12 @@ def write_slurm_content(file: TextIOWrapper, job: dict, machine_config: dict) ->
 
     # Main command and arguments
     job_args = job.get("script_args", {})
-    normalized_job_args = _normalize_script_args(job_args, machine_config, remote_storage)
+    normalized_job_args = _normalize_script_args(
+        job_args,
+        machine_config,
+        remote_storage,
+        path_args=job.get("path_args"),
+    )
     lines = _format_script_args(normalized_job_args)
     if lines:
         file.write(f"{job['script']} \\\n")
