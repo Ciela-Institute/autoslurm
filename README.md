@@ -8,13 +8,13 @@ running jobs on a SLURM cluster. It provides an abstraction layer over the SLURM
 shell scripts and provides the following features:
 
 - Reproducibility of job configurations
-  - User-agnostic job scheduling
-  - Job configurations saved in a human-readable format (JSON)
-  - Automated Job scheduling and submission
-- Bundling and submitting multiple jobs together with a single command
-- Inspecting bundle/job status and reading the latest SLURM output from the CLI
-- Dependency between jobs managed using names instead of SLURM specific job IDs
-- Submitting jobs remotely across SSH connections
+  - User-agnostic scheduling
+  - Reproducible configurations saved JSON
+  - Automated submission
+- Submitting multiple jobs together 
+- Inspecting job status and logs
+- Dependency management between jobs 
+- Remote jobs submission 
 
 ## Documentation
 
@@ -96,15 +96,15 @@ autoslurm-schedule my-script --submit --machine=machine\
 
 ### Inspect jobs and logs
 
-Use `autoslurm context` to inspect scheduled bundles without dumping the full
+Use `autoslurm logs` to inspect scheduled bundles without dumping the full
 bundle JSON by default.
 
 ```bash
-autoslurm context
-autoslurm context my-bundle
-autoslurm context my-bundle --job my-job --status
-autoslurm context my-bundle --job my-job --logs
-autoslurm context --latest-log
+autoslurm logs
+autoslurm logs my-bundle
+autoslurm logs my-bundle --job my-job --status
+autoslurm logs my-bundle --job my-job --logs
+autoslurm logs --latest --log
 ```
 
 This prints compact bundle and job summaries, SLURM status for a selected job,

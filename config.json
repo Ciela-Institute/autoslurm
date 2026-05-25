@@ -1,9 +1,0 @@
-{
-    "machines": {
-        "local": {
-            "env_command": "source /home/aadam/envs/python3.11/bin/activate",
-            "slurm_account": "rrg-lplevass"
-        }
-    },
-    "default_machine": "local"
-}

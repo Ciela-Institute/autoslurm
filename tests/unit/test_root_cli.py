@@ -19,21 +19,29 @@ def test_root_dispatches_action_arguments(monkeypatch):
 def test_root_accepts_action_aliases(monkeypatch):
     calls = []
 
-    def fake_context(argv=None):
-        calls.append(("context", argv))
+    def fake_logs(argv=None):
+        calls.append(("logs", argv))
 
     def fake_agent(argv=None):
         calls.append(("agent", argv))
 
-    monkeypatch.setitem(root.ACTION_HANDLERS, "context", fake_context)
+    def fake_configuration(argv=None):
+        calls.append(("configuration", argv))
+
+    monkeypatch.setitem(root.ACTION_HANDLERS, "logs", fake_logs)
     monkeypatch.setitem(root.ACTION_HANDLERS, "agent", fake_agent)
+    monkeypatch.setitem(root.ACTION_HANDLERS, "configuration", fake_configuration)
 
     root.main(["experiment-context", "--date", "20250101"])
+    root.main(["context", "--latest"])
     root.main(["agent-context", "--sections", "10_task_schedule.md"])
+    root.main(["config", "--summary"])
 
     assert calls == [
-        ("context", ["--date", "20250101"]),
+        ("logs", ["--date", "20250101"]),
+        ("logs", ["--latest"]),
         ("agent", ["--sections", "10_task_schedule.md"]),
+        ("configuration", ["--summary"]),
     ]
 
 
@@ -45,5 +53,5 @@ def test_root_help_lists_actions(capsys):
     assert "schedule" in captured.out
     assert "submit" in captured.out
     assert "configuration" in captured.out
-    assert "context" in captured.out
+    assert "logs" in captured.out
     assert "agent" in captured.out

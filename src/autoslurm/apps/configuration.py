@@ -360,6 +360,7 @@ def main(argv: list[str] | None = None):
         help="Print a short machine summary and exit.",
     )
     parser.add_argument(
+        "-i",
         "--interactive",
         action="store_true",
         help="Open the interactive machine configuration flow.",

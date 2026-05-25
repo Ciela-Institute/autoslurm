@@ -236,3 +236,28 @@ def test_autoslurm_configuration_interactive_creates_config(
     main(["--interactive"])
 
     assert config_file_path().exists()
+
+
+def test_autoslurm_configuration_short_interactive_flag(
+    tmp_path,
+    monkeypatch,
+):
+    from autoslurm.storage import set_storage_root
+
+    storage = tmp_path / "storage"
+    set_storage_root(storage)
+
+    answers = iter(
+        [
+            "rorqual",
+            "source /path/to/venv/bin/activate",
+            "def-bengioy",
+            "n",
+        ]
+    )
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: MagicMock(returncode=0, stderr=""))
+
+    main(["-i"])
+
+    assert config_file_path().exists()

@@ -4,7 +4,7 @@ import argparse
 import sys
 from typing import Callable
 
-from . import agent_context, configuration, experiment_context, initialize, schedule, submit, sync
+from . import agent_context, configuration, experiment_context, initialize, logs, schedule, submit, sync
 
 
 ACTION_HELP = {
@@ -13,7 +13,7 @@ ACTION_HELP = {
     "submit": "Submit an existing bundle.",
     "sync": "Pull remote AutoSlurm storage into the local mirror.",
     "initialize": "Create an empty bundle.",
-    "context": "Inspect bundle JSON, SLURM scripts, and logs.",
+    "logs": "Inspect bundle JSON, SLURM scripts, and logs.",
     "agent": "Print the agent documentation context.",
 }
 
@@ -23,12 +23,14 @@ ACTION_HANDLERS: dict[str, Callable[[list[str] | None], None]] = {
     "submit": submit.main,
     "sync": sync.main,
     "initialize": initialize.main,
-    "context": experiment_context.main,
+    "logs": logs.main,
     "agent": agent_context.main,
 }
 
 ACTION_ALIASES = {
-    "experiment-context": "context",
+    "config": "configuration",
+    "context": "logs",
+    "experiment-context": "logs",
     "agent-context": "agent",
 }
 

@@ -89,7 +89,7 @@ def test_experiment_context_reports_unstarted_job():
     assert "job 'pending_task' has not been submitted yet" in context
 
 
-def test_context_latest_log_prints_newest_out_file(tmp_path, capsys):
+def test_context_log_prints_newest_out_file_for_bundle(tmp_path, capsys):
     set_storage_root(tmp_path / "storage")
     ensure_storage_dirs()
 
@@ -121,20 +121,37 @@ def test_context_latest_log_prints_newest_out_file(tmp_path, capsys):
 
     from autoslurm.apps import experiment_context as experiment_context_app
 
-    experiment_context_app.main(["--latest-log"])
+    experiment_context_app.main([bundle_name, "--log"])
     output = capsys.readouterr().out.strip()
 
     assert output == "newer log"
 
 
-def test_context_latest_log_without_bundle_prints_latest_saved_out_file(tmp_path, capsys):
+def test_context_latest_bundle_log_prints_newest_out_file(tmp_path, capsys):
     set_storage_root(tmp_path / "storage")
     ensure_storage_dirs()
 
-    first_log = out_dir() / "bundle_a_job-1.out"
-    second_log = out_dir() / "bundle_b_job-2.out"
-    first_log.write_text("older storage log")
-    second_log.write_text("newest storage log")
+    bundle_name = "latest_bundle_experiment"
+    bundle = {
+        "analysis": {
+            "name": "analysis",
+            "script": "python train.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        },
+        "cleanup": {
+            "name": "cleanup",
+            "script": "python cleanup.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        },
+    }
+
+    save_bundle(bundle, bundle_name)
+    capsys.readouterr()
+
+    first_log = out_dir() / "analysis-1.out"
+    second_log = out_dir() / "cleanup-2.out"
+    first_log.write_text("older log")
+    second_log.write_text("newest log")
     older = 1_700_000_000
     newer = older + 10
     os.utime(first_log, (older, older))
@@ -142,17 +159,158 @@ def test_context_latest_log_without_bundle_prints_latest_saved_out_file(tmp_path
 
     from autoslurm.apps import experiment_context as experiment_context_app
 
-    experiment_context_app.main(["--latest-log"])
+    experiment_context_app.main(["--latest", "--log"])
     output = capsys.readouterr().out.strip()
 
-    assert output == "newest storage log"
+    assert output == "newest log"
 
 
-def test_context_latest_log_copies_to_clipboard(tmp_path, monkeypatch, capsys):
+def test_context_latest_bundle_log_accepts_numeric_job_selector(tmp_path, capsys):
     set_storage_root(tmp_path / "storage")
     ensure_storage_dirs()
 
-    log_path = out_dir() / "bundle_a_job-1.out"
+    bundle_name = "latest_bundle_numeric_job"
+    bundle = {
+        "analysis": {
+            "name": "analysis",
+            "script": "python train.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        },
+        "cleanup": {
+            "name": "cleanup",
+            "script": "python cleanup.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        },
+    }
+
+    save_bundle(bundle, bundle_name)
+    capsys.readouterr()
+
+    first_log = out_dir() / "analysis-1.out"
+    second_log = out_dir() / "cleanup-2.out"
+    first_log.write_text("older log")
+    second_log.write_text("newest log")
+    older = 1_700_000_000
+    newer = older + 10
+    os.utime(first_log, (older, older))
+    os.utime(second_log, (newer, newer))
+
+    from autoslurm.apps import experiment_context as experiment_context_app
+
+    experiment_context_app.main(["--latest", "--job", "1", "--log"])
+    output = capsys.readouterr().out.strip()
+
+    assert output == "newest log"
+
+
+def test_context_latest_bundle_job_defaults_to_log(tmp_path, capsys):
+    set_storage_root(tmp_path / "storage")
+    ensure_storage_dirs()
+
+    bundle_name = "latest_bundle_default_log"
+    bundle = {
+        "analysis": {
+            "name": "analysis",
+            "script": "python train.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        },
+        "cleanup": {
+            "name": "cleanup",
+            "script": "python cleanup.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        },
+    }
+
+    save_bundle(bundle, bundle_name)
+    capsys.readouterr()
+
+    first_log = out_dir() / "analysis-1.out"
+    second_log = out_dir() / "cleanup-2.out"
+    first_log.write_text("older log")
+    second_log.write_text("default latest log")
+    older = 1_700_000_000
+    newer = older + 10
+    os.utime(first_log, (older, older))
+    os.utime(second_log, (newer, newer))
+
+    from autoslurm.apps import experiment_context as experiment_context_app
+
+    experiment_context_app.main(["--latest", "--job", "1"])
+    output = capsys.readouterr().out.strip()
+
+    assert output == "default latest log"
+
+
+def test_context_latest_bundle_job_script_view(tmp_path, capsys):
+    set_storage_root(tmp_path / "storage")
+    ensure_storage_dirs()
+
+    bundle_name = "latest_bundle_script_view"
+    bundle = {
+        "analysis": {
+            "name": "analysis",
+            "script": "python train.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        }
+    }
+
+    save_bundle(bundle, bundle_name)
+    capsys.readouterr()
+
+    _, bundle_date = nearest_bundle_filename(bundle_name)
+    slurm_name = name_slurm_script(bundle["analysis"], bundle_date)
+    (slurm_dir() / slurm_name).write_text("#!/bin/bash\necho analysis")
+
+    from autoslurm.apps import experiment_context as experiment_context_app
+
+    experiment_context_app.main(["--latest", "--job", "1", "--script"])
+    output = capsys.readouterr().out.strip()
+
+    assert "#!/bin/bash" in output
+    assert "echo analysis" in output
+    assert "status=" not in output
+
+
+def test_context_log_reports_missing_logs_with_hint(tmp_path, capsys):
+    set_storage_root(tmp_path / "storage")
+    ensure_storage_dirs()
+
+    bundle_name = "empty_bundle"
+    bundle = {
+        "analysis": {
+            "name": "analysis",
+            "script": "python train.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        }
+    }
+    save_bundle(bundle, bundle_name)
+    capsys.readouterr()
+
+    from autoslurm.apps import experiment_context as experiment_context_app
+
+    experiment_context_app.main([bundle_name, "--log"])
+    output = capsys.readouterr().out.strip()
+
+    assert "No logs found for bundle 'empty_bundle'" in output
+    assert "Try `asl sync` or `asl logs --refresh`." in output
+
+
+def test_context_log_copies_to_clipboard(tmp_path, monkeypatch, capsys):
+    set_storage_root(tmp_path / "storage")
+    ensure_storage_dirs()
+
+    bundle_name = "clipboard_bundle"
+    bundle = {
+        "analysis": {
+            "name": "analysis",
+            "script": "python train.py",
+            "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
+        }
+    }
+    save_bundle(bundle, bundle_name)
+    capsys.readouterr()
+
+    log_path = out_dir() / "analysis-1.out"
     log_path.write_text("clipboard log")
 
     clipboard = {}
@@ -171,7 +329,7 @@ def test_context_latest_log_copies_to_clipboard(tmp_path, monkeypatch, capsys):
 
     from autoslurm.apps import experiment_context as experiment_context_app
 
-    experiment_context_app.main(["--log", "--clip"])
+    experiment_context_app.main([bundle_name, "--log", "--clip"])
     output = capsys.readouterr().out.strip()
 
     assert output == "clipboard log"
@@ -195,7 +353,8 @@ def test_context_latest_prints_latest_bundle_status(tmp_path, capsys):
     output = capsys.readouterr().out.splitlines()
 
     assert output[0].startswith("job_b ")
-    assert any(line.startswith("job_b status=") for line in output)
+    assert output[1].startswith("Use --job <number|name>")
+    assert any(line.startswith("1) job_b status=") for line in output)
 
 
 def test_context_refresh_syncs_before_printing(monkeypatch, capsys):

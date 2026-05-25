@@ -15,6 +15,7 @@ from ..experiment_context import (
     latest_log_context,
     job_context,
 )
+from ..save_load_jobs import latest_bundle_summaries
 from ..sync import sync_machine
 
 
@@ -123,11 +124,33 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
         nargs="?",
         help="Bundle name to inspect (e.g., the name passed to autoslurm-schedule).",
     )
-    _add_date_arguments(parser)
+    parser.add_argument(
+        "--view",
+        "-v",
+        action="store_true",
+        help="List the latest saved bundle per name.",
+    )
+    parser.add_argument(
+        "--latest",
+        "-l",
+        action="store_true",
+        help="Use the latest saved bundle.",
+    )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Sync the configured default machine before printing logs.",
+    )
+    parser.add_argument(
+        "--clipboard",
+        "--clip",
+        action="store_true",
+        help="Copy the printed output to the clipboard.",
+    )
     parser.add_argument(
         "--list",
         action="store_true",
-        help="List the latest saved bundle per name.",
+        help="List jobs in the selected bundle.",
     )
     parser.add_argument(
         "--job",
@@ -151,35 +174,19 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--full",
         action="store_true",
-        help="Print the full bundle context dump.",
+        help="Print the full bundle log and context dump.",
     )
     parser.add_argument(
-        "--latest-log",
         "--log",
         action="store_true",
-        help="Print the newest .out file for the selected bundle, or the newest bundle overall if no bundle is given.",
+        help="Print the latest .out file for the selected bundle or latest bundle.",
     )
-    parser.add_argument(
-        "--latest",
-        action="store_true",
-        help="Print the compact status view for the latest saved bundle.",
-    )
-    parser.add_argument(
-        "--refresh",
-        action="store_true",
-        help="Sync the configured default machine before printing context.",
-    )
-    parser.add_argument(
-        "--clipboard",
-        "--clip",
-        action="store_true",
-        help="Copy the printed context to the clipboard.",
-    )
+    _add_date_arguments(parser)
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Dump the context for a job or bundle."
+        description="Inspect logs for a job or bundle."
     )
     _add_common_arguments(parser)
     return parser
@@ -193,7 +200,7 @@ def main(argv=None) -> None:
         parser.print_help()
         return
     if not argv:
-        print(bundle_index_context())
+        parser.print_help()
         return
     args = parser.parse_args(argv)
 
@@ -201,30 +208,67 @@ def main(argv=None) -> None:
 
     if args.full and not args.bundle:
         parser.error("--full requires a bundle name.")
-    if args.job and not args.bundle:
-        parser.error("--job requires a bundle name.")
+    if args.job and not (args.bundle or args.latest):
+        parser.error("--job requires a bundle name or --latest.")
     if (args.script or args.logs or args.status) and not args.job:
         parser.error("--script, --logs, and --status require --job.")
-    if args.latest and any(
-        (args.list, args.job, args.script, args.logs, args.status, args.full, args.latest_log)
-    ):
-        parser.error("--latest cannot be combined with other context output flags.")
-    if args.latest_log and any(
-        (args.list, args.job, args.script, args.logs, args.status, args.full)
-    ):
-        parser.error("--latest-log cannot be combined with other context output flags.")
+    if args.latest and any((args.view, args.list, args.full)):
+        parser.error("--latest cannot be combined with other logs output flags.")
+    if args.log and any((args.view, args.list, args.script, args.logs, args.status, args.full)):
+        parser.error("--log cannot be combined with other logs output flags.")
+    if args.log and not (args.bundle or args.latest):
+        parser.error("--log requires a bundle name or --latest.")
 
     if args.refresh:
         sync_machine()
 
     if args.latest:
-        _emit(latest_bundle_status_context(reference_date), args.clipboard)
+        latest = latest_bundle_summaries(reference_date)
+        if not latest:
+            message = "No saved bundles found."
+            if args.log or args.job is not None:
+                message += " Try `asl sync` or `asl logs --refresh`."
+            _emit(message, args.clipboard)
+            return
+        bundle_name = latest[0]["bundle"]
+        if args.job is not None:
+            if args.script or args.logs or args.status or args.full:
+                include_status = args.status or not (args.script or args.logs)
+                _emit(
+                    job_context(
+                        bundle_name,
+                        args.job,
+                        reference_date,
+                        include_script=args.script,
+                        include_logs=args.logs,
+                        include_status=include_status,
+                    ),
+                    args.clipboard,
+                )
+                return
+            _emit(
+                latest_log_context(bundle_name, reference_date, args.job),
+                args.clipboard,
+            )
+            return
+        if args.log:
+            _emit(
+                latest_log_context(bundle_name, reference_date, args.job),
+                args.clipboard,
+            )
+            return
+        _emit(bundle_jobs_context(latest[0]["bundle"], reference_date), args.clipboard)
         return
-    if args.latest_log:
-        _emit(latest_log_context(args.bundle, reference_date), args.clipboard)
-        return
-    if args.list or not args.bundle:
+    if args.view or (args.list and not args.bundle):
         _emit(bundle_index_context(reference_date), args.clipboard)
+        return
+
+    if args.list:
+        _emit(bundle_jobs_context(args.bundle, reference_date), args.clipboard)
+        return
+
+    if args.log:
+        _emit(latest_log_context(args.bundle, reference_date, args.job), args.clipboard)
         return
 
     if args.full:
@@ -248,5 +292,9 @@ def main(argv=None) -> None:
 
     if args.script or args.logs or args.status:
         parser.error("--script, --logs, and --status require --job.")
+
+    if args.bundle is None:
+        _emit(bundle_index_context(reference_date), args.clipboard)
+        return
 
     _emit(bundle_jobs_context(args.bundle, reference_date), args.clipboard)
