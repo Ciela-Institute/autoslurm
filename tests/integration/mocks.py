@@ -127,6 +127,10 @@ def setup_mock_subprocess_run() -> Callable:
                 mock_run_instance.return_value.stdout = ""
                 mock_run_instance.return_value.returncode = 0
                 return mock_run_instance.return_value
+            if cmd[0] == "ssh" and ("-MNf" in cmd or "-O" in cmd):
+                mock_run_instance.return_value.stdout = ""
+                mock_run_instance.return_value.returncode = 0
+                return mock_run_instance.return_value
         job = os.path.split(cmd[-1])[-1]
         job_name = job.split("_")[-2].split(".")[0]
         job_id = mock_job_ids[job_name]

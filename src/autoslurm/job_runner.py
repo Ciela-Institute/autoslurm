@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from .job_to_slurm import create_slurm_script
 from .job_dependency import update_slurm_with_dependencies
-from .run_slurm import run_slurm_remotely, run_slurm_locally
+from .run_slurm import run_slurm_remotely, run_slurm_locally, ssh_submission_session
 from .save_load_jobs import (
     load_bundle,
     save_bundle,
@@ -69,21 +69,26 @@ def submit_jobs(
         slurm_name = create_slurm_script(job, date, machine_config)
         slurm_names[job["name"]] = slurm_name
 
-    for job in jobs:
-        slurm_name = slurm_names[job["name"]]
-        if machine_config.get("hostname") or machine_config.get("hosturl"):
-            transfer_slurm_to_remote(slurm_name, machine_config=machine_config)
-            job_id = run_slurm_remotely(slurm_name, machine_config=machine_config)
-            print(f"Submitted job {job['name']} with ID {job_id} at {host}")
-        else:
-            job_id = run_slurm_locally(slurm_name)
-            print(f"Submitted job {job['name']} with ID {job_id} locally")
+    with ssh_submission_session(machine_config, machine) as ssh_options:
+        for job in jobs:
+            slurm_name = slurm_names[job["name"]]
+            if machine_config.get("hostname") or machine_config.get("hosturl"):
+                transfer_slurm_to_remote(slurm_name, machine_config=machine_config)
+                job_id = run_slurm_remotely(
+                    slurm_name,
+                    machine_config=machine_config,
+                    ssh_options=ssh_options,
+                )
+                print(f"Submitted job {job['name']} with ID {job_id} at {host}")
+            else:
+                job_id = run_slurm_locally(slurm_name)
+                print(f"Submitted job {job['name']} with ID {job_id} locally")
 
-        job_metadata = {"machine": machine}
-        update_job_metadata(name, date, job["name"], job_metadata)
-        for dependent_job_name in dependencies.get(job["name"], []):
-            update_slurm_with_dependencies(slurm_names[dependent_job_name], job_id)
-        update_job_info_with_id(name, date, job["name"], job_id)
+            job_metadata = {"machine": machine}
+            update_job_metadata(name, date, job["name"], job_metadata)
+            for dependent_job_name in dependencies.get(job["name"], []):
+                update_slurm_with_dependencies(slurm_names[dependent_job_name], job_id)
+            update_job_info_with_id(name, date, job["name"], job_id)
 
     if machine_config.get("hostname") or machine_config.get("hosturl"):
         transfer_bundle_to_remote(name, date, machine_config=machine_config)
