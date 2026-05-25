@@ -12,7 +12,12 @@ from typing import Iterable, Optional
 from .definitions import DATE_FORMAT
 from .save_load_jobs import latest_bundle_summaries, load_bundle, nearest_bundle_filename
 from .storage import jobs_dir, slurm_dir, out_dir
-from .utils import load_config, name_slurm_script, ssh_host_from_config
+from .utils import (
+    activation_command_from_config,
+    load_config,
+    name_slurm_script,
+    ssh_host_from_config,
+)
 
 
 __all__ = [
@@ -319,7 +324,7 @@ def _fetch_remote_logs_for_job(
     if not machine_config.get("hostname") and not machine_config.get("hosturl"):
         return [], None
 
-    env_command = machine_config.get("env_command", "")
+    env_command = activation_command_from_config(machine_config)
     remote_path = machine_config.get("path", "~/.autoslurm")
     date_arg = bundle_date.strftime(DATE_FORMAT)
     bundle_arg = shlex.quote(bundle_name)

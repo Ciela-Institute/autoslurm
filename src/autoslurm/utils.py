@@ -8,7 +8,23 @@ import shlex
 import subprocess
 
 
-__all__ = ["load_config", "machine_config", "remote_storage_root_from_config"]
+__all__ = [
+    "load_config",
+    "machine_config",
+    "remote_storage_root_from_config",
+    "activation_command_from_config",
+]
+
+
+def activation_command_from_config(machine_config: dict) -> str:
+    """Return environment activation command from structured machine config."""
+    venv_path = machine_config.get("venv_path")
+    if isinstance(venv_path, str) and venv_path.strip():
+        return f"source {shlex.quote(venv_path)}/bin/activate"
+    env_command = machine_config.get("env_command", "")
+    if isinstance(env_command, str):
+        return env_command.strip()
+    return ""
 
 
 def name_slurm_script(job: dict, date: datetime):
@@ -112,7 +128,7 @@ def machine_config(
     if args is not None:
         machine_name = machine_name or args.machine
         if args.hosturl is not None or args.hostname is not None:
-            for key in ["slurm_account", "env_command"]:
+            for key in ["slurm_account"]:
                 if getattr(args, key, None) is None:
                     raise AttributeError(
                         f"Custom machine configuration with 'hosturl' requires {key}."
@@ -121,7 +137,7 @@ def machine_config(
                 value = getattr(args, key, None)
                 if value is not None:
                     final_overrides[key] = value
-        over_keys = ["env_command", "slurm_account"]
+        over_keys = ["env_command", "venv_path", "slurm_account"]
         for key in over_keys:
             value = getattr(args, key, None)
             if value is not None:
@@ -138,9 +154,10 @@ def machine_config(
         raise AttributeError(
             "'slurm_account' account must be provided. Rerun with --slurm_account option or rerun autoslurm-configuration to edit the configuration for the machine."
         )
-    if machine_config_.get("env_command") is None:
+    if not activation_command_from_config(machine_config_):
         raise AttributeError(
-            "'env_command' must be provided. Rerun with --env_command option or rerun autoslurm-configuration to edit the configuration for the machine."
+            "Either 'venv_path' or legacy 'env_command' must be provided. "
+            "Rerun with --venv_path option or rerun autoslurm-configuration."
         )
     return machine_name, machine_config_
 
@@ -199,7 +216,7 @@ def remote_storage_root_from_config(
     machine_config: dict, machine_name: Optional[str] = None
 ) -> str:
     hostname = ssh_host_from_config(machine_config, machine_name)
-    env_command = machine_config.get("env_command", "").strip()
+    env_command = activation_command_from_config(machine_config)
     python_probe = "from autoslurm.storage import storage_root; print(storage_root())"
     command_parts = []
     if env_command:

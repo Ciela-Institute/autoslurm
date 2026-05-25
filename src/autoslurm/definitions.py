@@ -11,6 +11,8 @@ MACHINE_KEYS = [
     "hosturl",
     "username",
     "key_path",
+    "results_root",
+    "venv_path",
     "env_command",
     "slurm_account",
 ]

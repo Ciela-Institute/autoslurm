@@ -30,7 +30,6 @@ def test_cli_submission(mock_load_config, slurm_emulator):
         "script": f"{sys.executable} {script_path}",
         "script_args": job_args,
         "dependencies": [],
-        "pre_commands": [],
         "slurm": {"tasks": 1, "cpus_per_task": 1, "mem": "1G", "time": "00:01:00"},
     }
 

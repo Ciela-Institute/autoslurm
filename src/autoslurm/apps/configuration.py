@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional
 
-from ..utils import load_config, ssh_host_from_config
+from ..utils import activation_command_from_config, load_config, ssh_host_from_config
 from ..storage import config_file_path
 
 
@@ -45,7 +45,7 @@ def _remote_ssh_command(machine: Dict, name: str, remote_command: str) -> list[s
 def _validation_shell_command(machine: Dict) -> str:
     python_probe = "import autoslurm; print(autoslurm.__file__)"
     python_command = f"python -c {shlex.quote(python_probe)}"
-    env_command = machine.get("env_command", "").strip()
+    env_command = activation_command_from_config(machine)
     if env_command:
         shell_command = f"{env_command} && {python_command}"
     else:
@@ -58,12 +58,12 @@ def _validate_machine(machine: Dict, name: str) -> bool:
         ssh_probe = _remote_ssh_command(machine, name, "true")
         result = subprocess.run(ssh_probe, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"SSH connectivity check failed for '{name}'.")
+            print(f"[{name}] SSH connectivity check: failed")
             message = result.stderr.strip() or result.stdout.strip()
             if message:
                 print(message)
             return False
-        print(f"SSH connectivity check passed for '{name}'.")
+        print(f"[{name}] SSH connectivity check: passed")
 
         validation_command = _validation_shell_command(machine)
         result = subprocess.run(
@@ -74,12 +74,12 @@ def _validate_machine(machine: Dict, name: str) -> bool:
             text=True,
         )
         if result.returncode != 0:
-            print(f"Python environment check failed for '{name}'.")
+            print(f"[{name}] Python environment check: failed")
             message = result.stderr.strip() or result.stdout.strip()
             if message:
                 print(message)
             return False
-        print(f"Python environment check passed for '{name}'.")
+        print(f"[{name}] Python environment check: passed")
         output = result.stdout.strip()
         if output:
             print(output)
@@ -88,12 +88,12 @@ def _validate_machine(machine: Dict, name: str) -> bool:
     validation_command = _validation_shell_command(machine)
     result = subprocess.run(["bash", "-lc", validation_command], capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"Python environment check failed for '{name}'.")
+        print(f"[{name}] Python environment check: failed")
         message = result.stderr.strip() or result.stdout.strip()
         if message:
             print(message)
         return False
-    print(f"Python environment check passed for '{name}'.")
+    print(f"[{name}] Python environment check: passed")
     output = result.stdout.strip()
     if output:
         print(output)
@@ -152,23 +152,29 @@ def _prompt_machine_name(config: Dict, default: str = "machine") -> str:
 
 def _prompt_machine_details(existing: Optional[Dict] = None) -> Dict:
     existing = existing or {}
-    env_command = _prompt_text(
-        "Command to activate the environment (e.g., source /path/to/venv/bin/activate)",
-        existing.get("env_command"),
+    venv_path = _prompt_text(
+        "Python virtual environment path (absolute or machine-local path to venv root; autoslurm uses <venv_path>/bin/activate)",
+        existing.get("venv_path"),
         required=True,
     )
     slurm_account = _prompt_text(
-        "SLURM account name",
+        "SLURM account (value used for #SBATCH --account)",
         existing.get("slurm_account"),
         required=True,
     )
     remote_default = bool(existing.get("hostname") or existing.get("hosturl"))
     is_remote = _prompt_yes_no("Is this a remote machine?", default="y" if remote_default else "n")
-    machine = {"env_command": env_command, "slurm_account": slurm_account}
+    machine = {"venv_path": venv_path, "slurm_account": slurm_account}
+    results_root = _prompt_text(
+        "Results root (optional absolute directory used to resolve relative output_dir values in job args)",
+        existing.get("results_root"),
+    )
+    if results_root:
+        machine["results_root"] = results_root
     if is_remote:
-        print("Choose how to describe the remote machine:")
-        print("  1) Use an SSH config alias (hostname only)")
-        print("  2) Provide host URL + username")
+        print("Remote connection mode:")
+        print("  1) SSH config alias (machine.hostname)")
+        print("  2) Explicit host URL + username")
         while True:
             connection_type = input("Connection type [1/2]: ").strip()
             if not connection_type:
@@ -176,18 +182,21 @@ def _prompt_machine_details(existing: Optional[Dict] = None) -> Dict:
             if connection_type in {"1", "2"}:
                 break
             print("Please enter 1 or 2.")
-        key_path = _prompt_text("SSH key path (optional)", existing.get("key_path"))
+        key_path = _prompt_text(
+            "SSH private key path (optional; used with explicit host URL or alias)",
+            existing.get("key_path"),
+        )
         if connection_type == "1":
             hostname = _prompt_text(
-                "SSH hostname alias", existing.get("hostname"), required=True
+                "SSH hostname alias (entry from ~/.ssh/config)", existing.get("hostname"), required=True
             )
             machine["hostname"] = hostname
         else:
             hosturl = _prompt_text(
-                "SSH host URL", existing.get("hosturl"), required=True
+                "Remote host URL (for example: login.cluster.edu)", existing.get("hosturl"), required=True
             )
             username = _prompt_text(
-                "SSH username", existing.get("username"), required=True
+                "Remote username", existing.get("username"), required=True
             )
             machine["hosturl"] = hosturl
             machine["username"] = username
@@ -229,6 +238,8 @@ def _create_machine(config: Dict):
     config["machines"][name] = machine
     _refresh_config_aliases(config)
     _save_config(config)
+    print(f"Saved machine '{name}'. Running validation...")
+    _validate_machine(machine, name)
     if _prompt_yes_no("Make this the default machine?", default="n"):
         config["default_machine"] = name
         _refresh_config_aliases(config)
@@ -243,6 +254,8 @@ def _update_machine(config: Dict):
     config["machines"][name] = machine
     _refresh_config_aliases(config)
     _save_config(config)
+    print(f"Saved machine '{name}'. Running validation...")
+    _validate_machine(machine, name)
 
 
 def _rename_machine(config: Dict):
@@ -286,7 +299,7 @@ def _set_default_machine_by_name(config: Dict, name: str):
 
 
 def _create_default_machine():
-    print("No configuration file detected. Let's configure the default machine.")
+    print("No AutoSlurm configuration file found. Configure the default machine.")
     config = {"machines": {}, "default_machine": ""}
     name = _prompt_machine_name(config)
     machine = _prompt_machine_details()
@@ -294,7 +307,7 @@ def _create_default_machine():
     config["default_machine"] = name
     _refresh_config_aliases(config)
     _save_config(config)
-    print("Default machine configured.")
+    print(f"Default machine saved: {name}")
     return config
 
 
@@ -304,12 +317,12 @@ def _menu_loop(config: Dict):
         for name in config["machines"]:
             default_marker = " (default)" if name == config["default_machine"] else ""
             print(f"  - {name}{default_marker}")
-        print("\nSelect an option:")
-        print("  1) Update an existing machine")
-        print("  2) Add a new machine")
-        print("  3) Rename a machine")
-        print("  4) Change the default machine")
-        print("  5) Validate a machine")
+        print("\nActions:")
+        print("  1) Edit machine fields")
+        print("  2) Add machine")
+        print("  3) Rename machine")
+        print("  4) Set default machine")
+        print("  5) Validate machine (SSH + Python env)")
         print("  6) Exit")
         choice = input("Choice: ").strip()
         if choice == "1":
@@ -323,7 +336,7 @@ def _menu_loop(config: Dict):
         elif choice == "5":
             _validate_machine_selection(config)
         elif choice == "6":
-            print("Configuration complete.")
+            print("Configuration saved.")
             break
         else:
             print("Please choose a valid option (1-6).")
@@ -332,7 +345,7 @@ def _menu_loop(config: Dict):
 def display_config():
     path = config_file_path()
     if not os.path.exists(path):
-        print("No configuration found.")
+        print("No configuration file found.")
         return
     with open(path, "r") as file:
         data = json.load(file)
@@ -342,32 +355,43 @@ def display_config():
 def display_config_summary():
     path = config_file_path()
     if not os.path.exists(path):
-        print("No configuration found.")
+        print("No configuration file found.")
         return
     config = load_config()
+    print("machine type default slurm_account venv_path results_root")
     for name, machine in config["machines"].items():
         machine_type = "remote" if _is_remote(machine) else "local"
         slurm_account = machine.get("slurm_account", "")
-        print(f"{name} {machine_type} {slurm_account}")
+        default_marker = "yes" if name == config["default_machine"] else "no"
+        venv_path = machine.get("venv_path", "")
+        results_root = machine.get("results_root", "")
+        print(f"{name} {machine_type} {default_marker} {slurm_account} {venv_path} {results_root}")
 
 
 def main(argv: list[str] | None = None):
-    parser = argparse.ArgumentParser(description="Configure AutoSlurm machines and view the stored config.")
-    parser.add_argument("--view", action="store_true", help="Print the current configuration file and exit.")
+    parser = argparse.ArgumentParser(
+        description="Configure AutoSlurm machine profiles and inspect stored configuration.",
+        epilog=(
+            "Path resolution: keep job output_dir values relative in bundles. "
+            "If results_root is set for a machine, autoslurm resolves relative output_dir "
+            "under that root. Otherwise, autoslurm resolves under <storage_root>/results."
+        ),
+    )
+    parser.add_argument("--view", action="store_true", help="Print raw configuration JSON and exit.")
     parser.add_argument(
         "--summary",
         action="store_true",
-        help="Print a short machine summary and exit.",
+        help="Print one-line machine summaries (type/default/account/venv/results_root) and exit.",
     )
     parser.add_argument(
         "-i",
         "--interactive",
         action="store_true",
-        help="Open the interactive machine configuration flow.",
+        help="Open interactive configuration editor.",
     )
     parser.add_argument(
         "--set-default",
-        help="Set the default machine by name and exit.",
+        help="Set default machine by exact name and exit.",
     )
     if argv is None:
         argv = sys.argv[1:]

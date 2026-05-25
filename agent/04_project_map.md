@@ -38,7 +38,11 @@ from autoslurm.save_load_jobs import schedule_job
 job = {
     "name": "analysis",
     "script": "stats-pipeline",
-    "script_args": {"input": "results.csv", "alpha": 0.05},
+    "script_args": {
+        "input": "results.csv",
+        "alpha": 0.05,
+        "output_dir": "my_project/results/analysis/run_001",
+    },
     "slurm": {"time": "00:45:00", "mem": "4G", "cpus_per_task": 2},
 }
 
@@ -70,6 +74,13 @@ Dependencies are embedded in the job structure (via the `dependencies` key). Aut
 - Use `--submit` to schedule and immediately submit the bundle, optionally with `--machine` to target a named machine from the config.
 - AutoSlurm derives the job name from the script name unless you pass `--job-name`. When you append multiple jobs that share the same name, AutoSlurm renames the duplicates by appending `_001`, `_002`, etc., so every entry in the bundle remains unique without manual ID tracking.
 - If you pass a `.py` filename (relative or absolute) instead of a registered entry point, AutoSlurm automatically prefixes the invocation with `python ` and derives the job name from the script basename, matching the Python API behavior.
+
+### Path policy for result directories
+
+- For arguments like `output_dir`, agents should emit a **project-relative path** that includes the project root folder (for example `substructure_lens/results/...`).
+- Do not hard-code machine-specific absolute prefixes (for example `/lustre...`, `/scratch...`) in job payloads.
+- AutoSlurm should resolve relative output paths against the target machine's configured results base (for example `results_root`) at script rendering time.
+- Absolute output paths are allowed only when a user explicitly requests a fixed location.
 
 Example command:
 
@@ -151,6 +162,7 @@ Agents can import these helpers directly (`import autoslurm`) when they need tig
 ## Configuration & state
 
 - **Global config** – `~/.autoslurmconfig` (see `autoslurm.definitions.CONFIG_FILE_PATH`). Contains machine entries keyed by human-friendly names plus the mandatory `local` section. Each entry includes `path`, `env_command`, and `slurm_account`; remote entries may also set `hostname`, `hosturl`, `username`, and `key_path`.
+- **Result root mapping** – machine configs may define a results base (for example `results_root`) used to convert relative `script_args["output_dir"]` values into absolute remote paths during SLURM script generation.
 - **Runtime environment** – each configured path hosts subdirectories (`data/`, `models/`, `results/`, `slurm/`, `jobs/`, `out/`). The configuration CLI ensures they exist locally and remotely.
 - **Bundles** – JSON schema roughly equals:
 

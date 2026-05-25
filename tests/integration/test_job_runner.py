@@ -112,7 +112,6 @@ print(\"Hello from an unregistered script!\")
         "script": str(script_path),
         "script_args": {},
         "dependencies": [],
-        "pre_commands": [],
         "slurm": {"tasks": 1, "cpus_per_task": 1, "mem": "1G", "time": "00:01:00"},
     }
 
@@ -144,7 +143,6 @@ def test_submit_jobs_from_bundle_file(
                 "learning_rate": "1e-3",
             },
             "dependencies": [],
-            "pre_commands": [],
             "slurm": {
                 "tasks": 1,
                 "cpus_per_task": 1,

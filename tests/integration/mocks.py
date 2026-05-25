@@ -33,7 +33,6 @@ mock_jobs = {
         "dependencies": ["JobA", "JobB"],
         "slurm": {"tasks": 1, "cpus_per_task": 4, "mem": "16G", "time": "03:00:00"},
         "script_args": {"param1": "value5", "param2": "value6"},
-        "pre_commands": ["echo 'Starting Job C'"],
     },
 }
 
@@ -81,7 +80,6 @@ expected_bundle_content = {
         "#SBATCH --mem=16G\n",
         "#SBATCH --time=03:00:00\n",
         "source /path/to/remote/venv/bin/activate\n",
-        "echo 'Starting Job C'\n",
         "run-job-c \\\n",
         "  --param1=value5 \\\n",
         "  --param2=value6\n",

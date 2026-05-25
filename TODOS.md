@@ -171,5 +171,14 @@ The docs still need a dedicated page that explains:
 - how `autoslurm submit --latest` works
 - how `asl logs` and `asl sync` differ
 - how remote storage is discovered and mirrored
+- the output-path contract for bundle builders:
+  - bundle job payloads should emit project-relative result paths (including project root segment)
+  - autoslurm resolves those relative paths to machine-specific absolute roots (for example `results_root`)
+  - when absolute output paths are acceptable and when they should be avoided
+- a design review of the current output-path chain to reduce hidden assumptions and moving parts:
+  - current default flow is `relative output_root` -> `project-prefixed relative output_dir` -> `autoslurm absolute resolution at slurm-render time`
+  - verify whether this should remain the general pattern across projects or be replaced by a simpler model with fewer implicit conventions
+  - evaluate whether project-prefixing belongs in project code, autoslurm core, or machine profile templates
 - why installed console scripts are the preferred experiment entry points
 - how the current experiment builders map to the workflow we used for the first successful runs
+- a refactored end-to-end CLI usage guide aligned with the new CLI surface and current scheduling/submission patterns

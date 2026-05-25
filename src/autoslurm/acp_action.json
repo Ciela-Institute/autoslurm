@@ -23,7 +23,7 @@
     "description": "Persist a fully formed job dict into the bundle directory (append or new bundle).",
     "parameters": {
       "bundle": "Required unless the job dict already contains a bundle entry.",
-      "job": "Required. A dict containing at least 'script' and 'slurm'; optional 'name', 'dependencies', 'pre_commands', etc.",
+      "job": "Required. A dict containing at least 'script' and 'slurm'; optional 'name', 'dependencies', etc.",
       "append": "Optional boolean. When true, appends to the latest bundle instead of creating a new timestamped file."
     },
     "context_sections": [

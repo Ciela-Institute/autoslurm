@@ -111,7 +111,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--dependencies', required=False, nargs='+', help='List of jobs that this job depends on to run.')
     # parser.add_argument('--dependency_type', nargs="+", default='afterany', choices=['afterany', 'afterok', 'afternotok', 'singleton'],
                             # help='Type of dependency to use for SLURM job submission.')
-    parser.add_argument('--pre-commands', required=False, nargs="+", help='List of bash commands to run before the script.')
 
     # SLURM configuration options
     slurm = parser.add_argument_group('slurm', 'SLURM configuration options.')
@@ -129,6 +128,7 @@ def _build_parser() -> argparse.ArgumentParser:
     machine_config.add_argument('--hosturl', required=False, help='The url of the machine. When provided, consider providing username and key_path also.')
     machine_config.add_argument('--username', required=False, help='Username for SSH login')
     machine_config.add_argument('--key_path', required=False, help='Path to the SSH private key.')
+    machine_config.add_argument('--venv_path', required=False, help='Path to the virtualenv root; autoslurm renders source <venv>/bin/activate.')
     machine_config.add_argument('--env_command', required=False, help='Command to activate the environment on the remote machine.')
     machine_config.add_argument('--slurm_account', required=False, help='SLURM account to use for job submission.')
     return parser
@@ -156,7 +156,6 @@ def main(argv=None):
         "script": args.script,
         "script_args": script_args,
         "dependencies": args.dependencies,
-        "pre-commands": args.pre_commands,
         "slurm": {
             "array": args.array,
             "tasks": args.tasks,

@@ -82,26 +82,23 @@ def test_write_slurm_with_none_value(mock_load_config):
     ), "None value should not be included in the script"
 
 
-def test_write_slurm_with_pre_commands_and_env_command(mock_load_config):
+def test_write_slurm_writes_activation_and_main_command(mock_load_config):
     job = {
-        "name": "pre_commands_test",
+        "name": "activation_test",
         "slurm": {},
         "script_args": {},
-        "script": "test-pre-commands-application",
-        "pre_commands": ["module load python", "module load cuda"],
+        "script": "test-activation-application",
     }
     file = StringIO()
 
     user_settings = mock_load_config.return_value
     machine_config = user_settings["local"]
-    machine_config["env_command"] = "source activate test-env"
+    machine_config["venv_path"] = "/tmp/venv"
     write_slurm_content(file, job, machine_config)
 
     content = file.getvalue()
-    print(content)
-    assert "module load python" in content
-    assert "module load cuda" in content
-    assert "source activate test-env" in content
+    assert "source /tmp/venv/bin/activate" in content
+    assert "test-activation-application" in content
 
 
 def test_write_slurm_output_dir_customization(mock_load_config):
@@ -155,3 +152,71 @@ def test_write_slurm_uses_remote_storage_root_when_path_missing(monkeypatch):
     content = file.getvalue()
     assert "#SBATCH --output=/remote/autoslurm/out/%x-%j.out" in content
     assert any(cmd[0] == "ssh" for cmd in calls)
+
+
+def test_write_slurm_resolves_relative_output_dir_with_results_root():
+    job = {
+        "name": "relative_output_dir_job",
+        "slurm": {},
+        "script_args": {"output_dir": "substructure_lens/results/run_001"},
+        "script": "test-app",
+    }
+    file = StringIO()
+    machine_config = {
+        "path": "/remote/autoslurm",
+        "env_command": "source activate test-env",
+        "slurm_account": "test-account",
+        "results_root": "/lustre10/scratch/aadam",
+    }
+
+    write_slurm_content(file, job, machine_config)
+    content = file.getvalue()
+    assert (
+        "--output-dir=/lustre10/scratch/aadam/substructure_lens/results/run_001"
+        in content
+    )
+
+
+def test_write_slurm_resolves_relative_output_dir_with_default_results_root():
+    job = {
+        "name": "relative_output_dir_default_root_job",
+        "slurm": {},
+        "script_args": {"output_dir": "substructure_lens/results/run_002"},
+        "script": "test-app",
+    }
+    file = StringIO()
+    machine_config = {
+        "path": "/remote/autoslurm",
+        "env_command": "source activate test-env",
+        "slurm_account": "test-account",
+    }
+
+    write_slurm_content(file, job, machine_config)
+    content = file.getvalue()
+    assert (
+        "--output-dir=/remote/autoslurm/results/substructure_lens/results/run_002"
+        in content
+    )
+
+
+def test_write_slurm_keeps_absolute_output_dir_unchanged():
+    job = {
+        "name": "absolute_output_dir_job",
+        "slurm": {},
+        "script_args": {"output_dir": "/lustre10/scratch/aadam/substructure_lens/results/run_003"},
+        "script": "test-app",
+    }
+    file = StringIO()
+    machine_config = {
+        "path": "/remote/autoslurm",
+        "env_command": "source activate test-env",
+        "slurm_account": "test-account",
+        "results_root": "/should/not/be/used",
+    }
+
+    write_slurm_content(file, job, machine_config)
+    content = file.getvalue()
+    assert (
+        "--output-dir=/lustre10/scratch/aadam/substructure_lens/results/run_003"
+        in content
+    )

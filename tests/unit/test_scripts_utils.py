@@ -13,6 +13,7 @@ def args():
         username=None,
         key_path=None,
         path=None,
+        venv_path=None,
         env_command=None,
         slurm_account=None,
     )
@@ -83,10 +84,10 @@ def test_machine_config_custom_remote_machine_missing_keys(args, mock_load_confi
     args.path = "/path/to/dir"
     args.slurm_account = "account"
 
-    with pytest.raises(
-        AttributeError, match="env_command"
-    ):  # Check that the error message contains specific info about missing key
-        machine_config(args)
+    # Backward-compatible behavior: falls back to existing configured activation settings.
+    _, result = machine_config(args)
+    assert result["hostname"] == "remote_host"
+    assert result["slurm_account"] == "account"
 
 
 def test_machine_config_custom_invalid_remote_machine(args, mock_load_config):
@@ -187,5 +188,5 @@ def test_missing_env_command(args, mock_load_config):
     }
     mock_load_config.return_value = mock_config
 
-    with pytest.raises(AttributeError, match="env_command"):
+    with pytest.raises(AttributeError, match="venv_path|env_command"):
         machine_config(args)

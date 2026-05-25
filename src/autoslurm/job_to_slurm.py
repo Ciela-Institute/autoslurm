@@ -1,9 +1,10 @@
 import os
 from io import TextIOWrapper
 from datetime import datetime
+from pathlib import PurePosixPath
 from .utils import name_slurm_script
 from .storage import ensure_storage_dirs, slurm_dir, storage_root
-from .utils import remote_storage_root_from_config
+from .utils import activation_command_from_config, remote_storage_root_from_config
 
 
 __all__ = ["create_slurm_script"]
@@ -45,6 +46,25 @@ def _format_script_args(job_args: dict) -> list[str]:
     return normalized
 
 
+def _normalize_script_args(
+    job_args: dict, machine_config: dict, remote_storage: str
+) -> dict:
+    normalized = dict(job_args)
+    output_dir = normalized.get("output_dir")
+    if not isinstance(output_dir, str) or output_dir.strip() == "":
+        return normalized
+    output_path = PurePosixPath(output_dir)
+    if output_path.is_absolute():
+        return normalized
+    results_root = machine_config.get("results_root")
+    if isinstance(results_root, str) and results_root.strip():
+        base = PurePosixPath(results_root)
+    else:
+        base = PurePosixPath(remote_storage) / "results"
+    normalized["output_dir"] = str(base / output_path)
+    return normalized
+
+
 def _write_script_args(file: TextIOWrapper, job_args: list[str]) -> None:
     for idx, line in enumerate(job_args):
         suffix = " \\\n" if idx < len(job_args) - 1 else "\n"
@@ -55,7 +75,7 @@ def write_slurm_content(file: TextIOWrapper, job: dict, machine_config: dict) ->
     """
     Writes the content of the SLURM script with formatted arguments, handling list arguments differently based on their type.
     """
-    env_command = machine_config.get("env_command", "")
+    env_command = activation_command_from_config(machine_config)
     slurm_account = machine_config.get("slurm_account", "")
 
     file.write("#!/bin/bash\n")
@@ -80,13 +100,10 @@ def write_slurm_content(file: TextIOWrapper, job: dict, machine_config: dict) ->
     if env_command:
         file.write(f"{env_command}\n")
 
-    # Pre-commands
-    for cmd in job.get("pre_commands", []):
-        file.write(f"{cmd}\n")
-
     # Main command and arguments
     job_args = job.get("script_args", {})
-    lines = _format_script_args(job_args)
+    normalized_job_args = _normalize_script_args(job_args, machine_config, remote_storage)
+    lines = _format_script_args(normalized_job_args)
     if lines:
         file.write(f"{job['script']} \\\n")
         _write_script_args(file, lines)

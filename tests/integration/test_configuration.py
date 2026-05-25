@@ -128,8 +128,9 @@ def test_autoslurm_configuration_summary(
     main(["--summary"])
     output = capsys.readouterr().out.strip().splitlines()
 
-    assert "local local def-bengioy" in output
-    assert "remote remote rrg-account_name" in output
+    assert output[0] == "machine type default slurm_account venv_path results_root"
+    assert any("local local yes def-bengioy" in line for line in output[1:])
+    assert any("remote remote no rrg-account_name" in line for line in output[1:])
 
 
 def test_autoslurm_configuration_rename_machine(
@@ -227,6 +228,7 @@ def test_autoslurm_configuration_interactive_creates_config(
             "rorqual",
             "source /path/to/venv/bin/activate",
             "def-bengioy",
+            "",
             "n",
         ]
     )
@@ -252,6 +254,7 @@ def test_autoslurm_configuration_short_interactive_flag(
             "rorqual",
             "source /path/to/venv/bin/activate",
             "def-bengioy",
+            "",
             "n",
         ]
     )
@@ -261,3 +264,11 @@ def test_autoslurm_configuration_short_interactive_flag(
     main(["-i"])
 
     assert config_file_path().exists()
+
+
+def test_autoslurm_configuration_help_mentions_results_root(capsys):
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    output = capsys.readouterr().out
+    assert "results_root" in output
+    assert "relative output_dir" in output

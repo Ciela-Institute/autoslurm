@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Optional
 
 from .storage import storage_root
-from .utils import machine_config as resolve_machine_config, scp_host_and_keypath_from_config, ssh_host_from_config
+from .utils import (
+    activation_command_from_config,
+    machine_config as resolve_machine_config,
+    scp_host_and_keypath_from_config,
+    ssh_host_from_config,
+)
 
 SYNC_DIRECTORIES = ("jobs", "slurm", "out")
 
@@ -22,7 +27,7 @@ def _remote_ssh_command(machine: dict, machine_name: str, remote_command: str) -
 
 def _remote_storage_root(machine: dict, machine_name: str) -> str:
     python_probe = "from autoslurm.storage import storage_root; print(storage_root())"
-    env_command = machine.get("env_command", "").strip()
+    env_command = activation_command_from_config(machine)
     command_parts = []
     if env_command:
         command_parts.append(env_command)
