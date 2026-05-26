@@ -219,3 +219,10 @@ Potential package rename candidates to revisit later:
 - `dagsubmit`
 - `bundlequeue`
 - `remotesubmit`
+
+## Logs UX Follow-up
+
+- Improve `asl logs` behavior for SLURM array jobs:
+  - resolve and display array task logs (`%A_%a` patterns) more reliably
+  - make job selection/output intuitive when a bundle contains array submissions
+  - document expected array-log lookup behavior in CLI docs

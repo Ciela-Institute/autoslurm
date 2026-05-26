@@ -117,7 +117,6 @@ def test_context_job_status_is_compact(tmp_path, monkeypatch, capsys):
             "name": "analysis",
             "script": "run-analysis",
             "id": "12345",
-            "machine": "local",
             "slurm": {"time": "00:05:00", "mem": "1G", "cpus_per_task": 1},
         }
     }
@@ -200,11 +199,13 @@ def test_context_job_status_batches_remote_queries(tmp_path, monkeypatch, capsys
     experiment_context.main(["experiment", "--list"])
     output = capsys.readouterr().out
 
-    assert seen["ssh"] == 1
+    assert seen["ssh"] == 2
     assert "analysis" in output
     assert "cleanup" in output
-    assert "status=RUNNING" in output
-    assert "status=PENDING" in output
+    assert "remaining" in output
+    assert "RUNNING" in output
+    assert "status" in output
+    assert "PENDING" in output
 
 
 def test_context_job_script_view_is_compact(tmp_path, capsys):
@@ -229,3 +230,49 @@ def test_context_job_script_view_is_compact(tmp_path, capsys):
     assert "analysis" in output
     assert "#!/bin/bash" in output
     assert "path=" not in output
+
+
+def test_context_list_includes_resources_and_dependencies_topological_order(tmp_path, monkeypatch, capsys):
+    set_storage_root(tmp_path / "storage")
+    ensure_storage_dirs()
+
+    bundle = {
+        "train": {
+            "name": "train",
+            "script": "run-train",
+            "id": "101",
+            "slurm": {"time": "02:00:00", "gres": "gpu:2"},
+        },
+        "eval": {
+            "name": "eval",
+            "script": "run-eval",
+            "id": "202",
+            "dependencies": ["train"],
+            "slurm": {"time": "00:30:00"},
+        },
+    }
+    _write_bundle("experiment_20250102000000.json", bundle)
+
+    def fake_run(cmd, *args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = "101|COMPLETED\n202|PENDING\n"
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    experiment_context.main(["experiment", "--list"])
+    lines = capsys.readouterr().out.splitlines()
+
+    assert any("time" in line and "gpus" in line and "dependencies" in line for line in lines)
+    train_row = next(line for line in lines if " train " in f" {line} ")
+    eval_row = next(line for line in lines if " eval " in f" {line} ")
+    assert "02:00:00" in train_row
+    assert "2" in train_row
+    assert "-" in train_row
+    assert "00:30:00" in eval_row
+    assert "0" in eval_row
+    assert "train" in eval_row
+    assert lines.index(train_row) < lines.index(eval_row)

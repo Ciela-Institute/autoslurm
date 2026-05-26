@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shlex
 import subprocess
+import re
 from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
@@ -70,6 +71,21 @@ def _parse_status_lines(text: str) -> dict[str, str]:
     return statuses
 
 
+def _parse_job_field_lines(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or "|" not in line:
+            continue
+        job_id, value = line.split("|", 1)
+        job_id = job_id.strip()
+        value = value.strip()
+        if not job_id or not value:
+            continue
+        values[job_id] = value
+    return values
+
+
 def _fetch_statuses_locally(job_ids: list[str]) -> dict[str, str]:
     if not job_ids:
         return {}
@@ -98,7 +114,7 @@ def _fetch_statuses_remotely(
     try:
         hostname = ssh_host_from_config(machine_config, machine_name)
     except AttributeError:
-        return _fetch_statuses_locally(job_ids)
+        return {}
 
     remote_script = "\n".join(
         [
@@ -134,16 +150,67 @@ def _fetch_statuses_for_job_ids(
     try:
         config = load_config()
     except EnvironmentError:
-        return _fetch_statuses_locally(job_ids)
+        return {}
 
     machine_config = config["machines"].get(machine_name) or config.get(machine_name)
     if machine_config is None:
-        return _fetch_statuses_locally(job_ids)
-
-    if not machine_config.get("hostname") and not machine_config.get("hosturl"):
-        return _fetch_statuses_locally(job_ids)
+        return {}
 
     return _fetch_statuses_remotely(job_ids, machine_name, machine_config)
+
+
+def _fetch_time_left_locally(job_ids: list[str]) -> dict[str, str]:
+    if not job_ids:
+        return {}
+    query = ",".join(job_ids)
+    result = subprocess.run(
+        ["squeue", "-h", "-j", query, "-o", "%i|%L"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return {}
+    return _parse_job_field_lines(result.stdout or result.stderr or "")
+
+
+def _fetch_time_left_remotely(
+    job_ids: list[str], machine_name: str, machine_config: dict
+) -> dict[str, str]:
+    if not job_ids:
+        return {}
+    query = ",".join(job_ids)
+    try:
+        hostname = ssh_host_from_config(machine_config, machine_name)
+    except AttributeError:
+        return {}
+
+    remote_script = f"squeue -h -j {shlex.quote(query)} -o '%i|%L' 2>/dev/null || true"
+    result = subprocess.run(
+        ["ssh", *shlex.split(hostname), f"bash -lc {shlex.quote(remote_script)}"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return {}
+    return _parse_job_field_lines(result.stdout or result.stderr or "")
+
+
+def _fetch_time_left_for_job_ids(
+    job_ids: list[str], machine_name: Optional[str]
+) -> dict[str, str]:
+    if not job_ids:
+        return {}
+    if machine_name is None:
+        return _fetch_time_left_locally(job_ids)
+    try:
+        config = load_config()
+    except EnvironmentError:
+        return {}
+
+    machine_config = config["machines"].get(machine_name) or config.get(machine_name)
+    if machine_config is None:
+        return {}
+    return _fetch_time_left_remotely(job_ids, machine_name, machine_config)
 
 
 def _job_status_text(job: dict) -> str:
@@ -172,28 +239,102 @@ def _job_status_texts(jobs: list[dict]) -> dict[str, str]:
     return statuses
 
 
+def _job_remaining_times(jobs: list[dict], statuses: dict[str, str]) -> dict[str, str]:
+    remaining: dict[str, str] = {job["name"]: "-" for job in jobs}
+    by_machine: dict[Optional[str], list[dict]] = defaultdict(list)
+    for job in jobs:
+        by_machine[job.get("machine")].append(job)
+
+    for machine_name, machine_jobs in by_machine.items():
+        running = [
+            job
+            for job in machine_jobs
+            if job.get("id") is not None and statuses.get(job["name"], "UNKNOWN").upper() == "RUNNING"
+        ]
+        if not running:
+            continue
+        job_ids = [str(job["id"]) for job in running]
+        left = _fetch_time_left_for_job_ids(job_ids, machine_name)
+        for job in running:
+            remaining[job["name"]] = left.get(str(job["id"]), "UNKNOWN")
+    return remaining
+
+
 def _bundle_summary_lines(desired_date: Optional[datetime] = None) -> list[str]:
     summaries = latest_bundle_summaries(desired_date=desired_date)
     if not summaries:
         return ["No saved bundles found."]
-    bundle_width = max(len("bundle"), max(len(entry["bundle"]) for entry in summaries))
-    saved_values = [entry["date"].strftime("%Y-%m-%d %H:%M") for entry in summaries]
-    saved_width = max(len("saved"), max(len(value) for value in saved_values))
-    jobs_width = max(
-        len("jobs"),
-        max(len(str(entry.get("job_count", len(entry.get("jobs", []))))) for entry in summaries),
-    )
-    header = (
-        f"{'bundle'.center(bundle_width)}  "
-        f"{'saved'.center(saved_width)}  "
-        f"{'jobs'.center(jobs_width)}"
-    )
+    rows: list[dict[str, str]] = []
+    for entry in summaries:
+        bundle_name = entry["bundle"]
+        saved_value = entry["date"].strftime("%Y-%m-%d %H:%M")
+
+        try:
+            jobs, _, _ = load_bundle(bundle_name, entry["date"])
+        except (FileNotFoundError, OSError, ValueError, KeyError, json.JSONDecodeError):
+            job_count = entry.get("job_count", 0)
+            row = {
+                "bundle": bundle_name,
+                "saved": saved_value,
+                "jobs": str(job_count),
+                "submitted": "-",
+                "running": "-",
+                "completed": "-",
+                "pending": "-",
+                "failed": "-",
+            }
+            rows.append(row)
+            continue
+
+        statuses = _job_status_texts(jobs)
+        submitted = sum(1 for job in jobs if job.get("id") is not None)
+
+        completed = 0
+        running = 0
+        pending = 0
+        failed = 0
+        for job in jobs:
+            state = statuses.get(job["name"], "UNKNOWN").upper()
+            if state == "COMPLETED":
+                completed += 1
+            elif state == "RUNNING":
+                running += 1
+            elif state in {"PENDING", "CONFIGURING"}:
+                pending += 1
+            elif state in {
+                "FAILED",
+                "CANCELLED",
+                "TIMEOUT",
+                "NODE_FAIL",
+                "OUT_OF_MEMORY",
+                "PREEMPTED",
+                "BOOT_FAIL",
+                "DEADLINE",
+                "REVOKED",
+            }:
+                failed += 1
+
+        row = {
+            "bundle": bundle_name,
+            "saved": saved_value,
+            "jobs": str(len(jobs)),
+            "submitted": str(submitted),
+            "running": str(running),
+            "completed": str(completed),
+            "pending": str(pending),
+            "failed": str(failed),
+        }
+        rows.append(row)
+
+    headers = ["bundle", "saved", "jobs", "submitted", "running", "completed", "pending", "failed"]
+    widths = {
+        key: max(len(key), max(len(row[key]) for row in rows))
+        for key in headers
+    }
+    header = "  ".join(key.center(widths[key]) for key in headers)
     lines = [header]
-    for entry, saved_value in zip(summaries, saved_values):
-        bundle = entry["bundle"].ljust(bundle_width)
-        saved = saved_value.ljust(saved_width)
-        jobs = str(entry.get("job_count", len(entry.get("jobs", [])))).ljust(jobs_width)
-        lines.append(f"{bundle}  {saved}  {jobs}")
+    for row in rows:
+        lines.append("  ".join(row[key].ljust(widths[key]) for key in headers))
     return lines
 
 
@@ -212,20 +353,83 @@ def _load_bundle_snapshot(
 
 
 def bundle_jobs_context(bundle_name: str, desired_date: Optional[datetime] = None) -> str:
+    def _requested_time(job: dict) -> str:
+        slurm = job.get("slurm") or {}
+        value = slurm.get("time")
+        return str(value) if value else "-"
+
+    def _requested_gpus(job: dict) -> str:
+        slurm = job.get("slurm") or {}
+        gres = slurm.get("gres")
+        if not gres:
+            return "0"
+        text = str(gres)
+        match = re.search(r"gpu(?::[^:,]+)?:(\d+)", text)
+        if match:
+            return match.group(1)
+        if "gpu" in text.lower():
+            return "1"
+        return "0"
+
+    def _dependencies_text(job: dict) -> str:
+        deps = job.get("dependencies")
+        if not deps:
+            return "-"
+        if isinstance(deps, (list, tuple)):
+            return ",".join(str(dep) for dep in deps)
+        return str(deps)
+
     jobs, _, bundle_date = load_bundle(bundle_name, desired_date)
     statuses = _job_status_texts(jobs)
+    remaining = _job_remaining_times(jobs, statuses)
     lines = [f"{bundle_name} {bundle_date.isoformat()}"]
     lines.append("Use --job <number|name> to inspect a job.")
-    for index, job in enumerate(jobs, start=1):
+    rows: list[tuple[str, str, str, str, str, str, str]] = []
+    for job in jobs:
         job_name = job["name"]
         status = statuses.get(job_name)
         if status is None:
             status = _job_status_text(job)
         job_id = job.get("id")
-        job_bits = [f"{index})", job_name, f"status={status}"]
-        if job_id is not None:
-            job_bits.append(f"id={job_id}")
-        lines.append(" ".join(job_bits))
+        rows.append(
+            (
+                str(job_id) if job_id is not None else "-",
+                job_name,
+                _requested_time(job),
+                _requested_gpus(job),
+                _dependencies_text(job),
+                remaining.get(job_name, "-"),
+                status,
+            )
+        )
+
+    id_width = max(len("id"), max(len(row[0]) for row in rows))
+    name_width = max(len("name"), max(len(row[1]) for row in rows))
+    time_width = max(len("time"), max(len(row[2]) for row in rows))
+    gpus_width = max(len("gpus"), max(len(row[3]) for row in rows))
+    deps_width = max(len("dependencies"), max(len(row[4]) for row in rows))
+    remaining_width = max(len("remaining"), max(len(row[5]) for row in rows))
+    status_width = max(len("status"), max(len(row[6]) for row in rows))
+    lines.append(
+        f"{'id'.center(id_width)}  "
+        f"{'name'.center(name_width)}  "
+        f"{'time'.center(time_width)}  "
+        f"{'gpus'.center(gpus_width)}  "
+        f"{'dependencies'.center(deps_width)}  "
+        f"{'remaining'.center(remaining_width)}  "
+        f"{'status'.center(status_width)}"
+    )
+    for job_id, job_name, time_text, gpus_text, deps_text, remaining_text, status in rows:
+        deps_rendered = deps_text.center(deps_width) if deps_text == "-" else deps_text.ljust(deps_width)
+        lines.append(
+            f"{job_id.ljust(id_width)}  "
+            f"{job_name.ljust(name_width)}  "
+            f"{time_text.ljust(time_width)}  "
+            f"{gpus_text.ljust(gpus_width)}  "
+            f"{deps_rendered}  "
+            f"{remaining_text.ljust(remaining_width)}  "
+            f"{status.ljust(status_width)}"
+        )
     return "\n".join(lines)
 
 
