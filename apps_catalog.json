@@ -1,0 +1,50 @@
+{
+  "repos": [
+    {
+      "apps": [
+        {
+          "name": "substructure-lens-build-jacobian-bundle",
+          "source": "pyproject.project.scripts",
+          "target": "substructure_lens.job_bundles.build_jacobian_bundle:cli"
+        },
+        {
+          "name": "substructure-lens-build-mode-jacobian",
+          "source": "pyproject.project.scripts",
+          "target": "substructure_lens.cli.build_mode_jacobian:cli"
+        },
+        {
+          "name": "substructure-lens-inspect-jacobian",
+          "source": "pyproject.project.scripts",
+          "target": "substructure_lens.cli.inspect_jacobian:cli"
+        },
+        {
+          "name": "substructure-lens-production-run",
+          "source": "pyproject.project.scripts",
+          "target": "substructure_lens.job_bundles.production_run:cli"
+        },
+        {
+          "name": "substructure-lens-sweep-alpha",
+          "source": "pyproject.project.scripts",
+          "target": "substructure_lens.job_bundles.sweep_alpha:cli"
+        },
+        {
+          "name": "substructure-lens-sweep-resolution",
+          "source": "pyproject.project.scripts",
+          "target": "substructure_lens.job_bundles.sweep_resolution:cli"
+        },
+        {
+          "name": "substructure-lens-transfer-bundle",
+          "source": "pyproject.project.scripts",
+          "target": "substructure_lens.job_bundles.transfer_bundle:cli"
+        },
+        {
+          "name": "substructure-lens-transfer-function",
+          "source": "pyproject.project.scripts",
+          "target": "substructure_lens.cli.transfer_function:cli"
+        }
+      ],
+      "repo": "/home/alexandre/Desktop/Projects/substructure/substructure_lens",
+      "scanned_at": "2026-05-26T17:07:08"
+    }
+  ]
+}

@@ -10,6 +10,7 @@ from . import (
     experiment_context,
     inspect,
     initialize,
+    scan,
     schedule,
     status,
     submit,
@@ -24,6 +25,7 @@ ACTION_HELP = {
     "sync": "Pull remote AutoSlurm storage into the local mirror.",
     "initialize": "Create an empty bundle.",
     "status": "Show bundles with saved timestamp and job count.",
+    "scan": "Scan and list your own package apps.",
     "inspect": "Inspect bundle jobs and output logs.",
     "agent": "Print the agent documentation context.",
 }
@@ -35,6 +37,7 @@ ACTION_HANDLERS: dict[str, Callable[[list[str] | None], None]] = {
     "sync": sync.main,
     "initialize": initialize.main,
     "status": status.main,
+    "scan": scan.main,
     "inspect": inspect.main,
     "agent": agent_context.main,
 }
